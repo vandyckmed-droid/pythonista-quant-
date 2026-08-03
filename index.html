@@ -7,9 +7,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0d0d0d">
 <title>Momentum</title>
-<meta name="build" content="381b86f3">
+<meta name="build" content="bd4a90f4">
 <link rel="icon" href="data:,">
-<link rel="stylesheet" href="css/styles.css?v=381b86f3">
+<link rel="stylesheet" href="css/styles.css?v=bd4a90f4">
 </head>
 <body>
 
@@ -26,6 +26,7 @@
   <section id="view-screen" class="view">
     <div class="chips" id="sort-chips">
       <button class="chip active" data-sort="rank">Rank</button>
+      <button class="chip" data-sort="diversify">Diversifies</button>
       <button class="chip" data-sort="chg1d">Today</button>
       <button class="chip" data-sort="ret">Return</button>
       <button class="chip" data-sort="vol">Volatility</button>
@@ -37,10 +38,15 @@
   <section id="view-watchlist" class="view hidden">
     <div id="watchlist-empty" class="empty hidden">
       <p>No names yet.</p>
-      <p class="sub">Tap the ☆ on any stock in the Screen tab to build your watchlist.</p>
+      <p class="sub">Tap the ☆ on any stock in the Screen tab to build your watchlist — or let the app start you off.</p>
+      <button class="chip suggest-btn">＋ Suggest a name</button>
     </div>
     <div id="watchlist-body">
       <div class="list" id="watchlist-list"></div>
+      <h2 class="section-title">Families covered</h2>
+      <p class="section-sub">The 150 group into eight behaviour families. Spreading across them is what lowers risk.</p>
+      <div id="family-coverage"></div>
+      <button class="chip suggest suggest-btn">＋ Suggest a name</button>
       <h2 class="section-title">Portfolio risk</h2>
       <p class="section-sub">Equal focus on your watchlist names, 5-year daily history.</p>
       <div class="tiles" id="risk-tiles"></div>
@@ -96,6 +102,6 @@
   </button>
 </nav>
 
-<script type="module" src="js/app.js?v=381b86f3"></script>
+<script type="module" src="js/app.js?v=bd4a90f4"></script>
 </body>
 </html>

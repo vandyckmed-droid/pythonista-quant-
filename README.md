@@ -14,6 +14,10 @@ Data source: Financial Modeling Prep (FMP), end-of-day prices.
    tickers. When one company has two ticker symbols (GOOG/GOOGL), keep only the
    bigger one so no company appears twice.
 3. **Cut to the 1,500 largest** by company value. That's the universe being judged.
+   Names with under **2 years of price history** are then dropped before ranking —
+   a stock we can't measure correlations for is one we'd be holding blind, so it
+   never enters the list. (This does exclude recent IPOs and spin-offs, which
+   momentum screens otherwise surface a lot of.)
 4. **Measure momentum.** For each stock, look at its price journey from ~10 months
    ago to ~1 month ago (trading days 200 back to 20 back, dividend-adjusted).
    Two numbers come out: how much it gained, and how bumpy the ride was. The score
@@ -44,11 +48,16 @@ Both need the `FMP_API_KEY` repository secret, and both commit the refreshed
 ## The app
 
 - **Screen** — the ranked members, sortable, with sparklines; tap a row for
-  detail, tap ☆ to watchlist a name.
+  detail, tap ☆ to watchlist a name. Every name carries a coloured dot for its
+  **behaviour family**, and a `≈ MU 0.75` tag appears on names that closely
+  track something already in your watchlist. The **Diversifies** sort ranks the
+  whole list by how much each name would add to your effective bets.
 - **Watchlist** — risk analysis on your selected names using the stored 5-year
   history: correlation matrix, effective number of bets (ENB), and
   hierarchical-risk-parity (HRP) weights. Computed in the browser; the watchlist
-  itself is saved on the device.
+  itself is saved on the device. **Families covered** shows which of the eight
+  behaviour families you hold, and **Suggest a name** adds the single best
+  diversifier — one tap at a time, never a bulk auto-fill.
 - **Detail** — scrubbable price chart (1M–5Y) and fuller stats per name.
 
 The header always shows when the list was last formed and how fresh prices are.
@@ -60,6 +69,8 @@ index.html, css/, js/     the app (vanilla JS, no build step)
 data/meta.json            refresh timestamps + screen parameters
 data/screen.json          ranked member list with summary stats
 data/history/{SYM}.json   5y of daily adjusted closes per member
+data/risk.json            precomputed correlation matrix + behaviour families
+data/archive/             point-in-time copy of every screen, for later back-tests
 scripts/fmp.py            shared FMP API helpers (stdlib only)
 scripts/screen.py         the wide screen -> membership, ranks, 5y histories
 scripts/update.py         members-only price catch-up
