@@ -60,7 +60,7 @@ function sortedMembers() {
   return ms;
 }
 
-function rowHTML(m) {
+function rowHTML(m, showVol = false) {
   const dir = m.chg1d >= 0 ? 'up' : 'down';
   const starred = state.watchlist.has(m.symbol);
   return `
@@ -74,13 +74,14 @@ function rowHTML(m) {
       <div class="px">
         <div class="price">${fmt.price(m.price)}</div>
         <div class="chg ${dir}">${fmt.pct(m.chg1d)}</div>
+        ${showVol ? `<div class="volline">vol ${fmt.pct1(m.vol)}</div>` : ''}
       </div>
       <button class="star ${starred ? 'on' : ''}" data-star="${m.symbol}">${starred ? '★' : '☆'}</button>
     </div>`;
 }
 
-function renderList(container, members) {
-  container.innerHTML = members.map(rowHTML).join('');
+function renderList(container, members, showVol = false) {
+  container.innerHTML = members.map(m => rowHTML(m, showVol)).join('');
   requestAnimationFrame(() => {
     container.querySelectorAll('.row').forEach(rowEl => {
       const m = state.bySym.get(rowEl.dataset.sym);
@@ -103,7 +104,7 @@ async function renderWatchlist() {
   if (empty) return;
 
   const members = syms.map(s => state.bySym.get(s)).sort((a, b) => a.rank - b.rank);
-  renderList($('#watchlist-list'), members);
+  renderList($('#watchlist-list'), members, true);
 
   const tiles = $('#risk-tiles');
   const hrpEl = $('#hrp-bars');
@@ -114,6 +115,7 @@ async function renderWatchlist() {
     tiles.innerHTML = `<div class="tile" style="grid-column:1/-1"><div class="t-label">Add at least two names for correlation, ENB and HRP.</div></div>`;
     hrpEl.innerHTML = '';
     heatEl.innerHTML = '';
+    $('#corr-pairs').innerHTML = '';
     return;
   }
 
@@ -169,6 +171,31 @@ async function renderWatchlist() {
     `<span class="corr-key"><span class="corr-swatch" style="background:${b.color}"></span>${b.label}</span>`).join('');
   heatEl.innerHTML = `<div class="corr-grid" style="grid-template-columns:44px repeat(${n},34px)">${cells}</div>` +
     `<div class="corr-legend">${legend}</div>`;
+  // every pair ranked, most to least correlated
+  const pairsRanked = [];
+  for (let i = 0; i < n; i++)
+    for (let j = i + 1; j < n; j++)
+      pairsRanked.push({ a: oSyms[i], b: oSyms[j], v: corr[i][j] });
+  pairsRanked.sort((x, y) => y.v - x.v);
+  const pairRow = p => `
+    <div class="pair-row">
+      <span class="corr-swatch" style="background:${corrColor(p.v)}"></span>
+      <span class="pair-syms">${p.a} × ${p.b}</span>
+      <span class="pair-val">${p.v.toFixed(2)}</span>
+    </div>`;
+  const pairsEl = $('#corr-pairs');
+  const SHOW = 12;
+  const renderPairs = all => {
+    pairsEl.innerHTML =
+      (all ? pairsRanked : pairsRanked.slice(0, SHOW)).map(pairRow).join('') +
+      (pairsRanked.length > SHOW
+        ? `<button class="chip pairs-more">${all ? 'Show fewer' : `Show all ${pairsRanked.length}`}</button>`
+        : '');
+    const btn = pairsEl.querySelector('.pairs-more');
+    if (btn) btn.addEventListener('click', () => renderPairs(!all));
+  };
+  renderPairs(false);
+
   heatEl.querySelectorAll('.corr-cell').forEach(c => {
     c.addEventListener('click', () => {
       heatEl.querySelectorAll('.corr-cell.sel').forEach(x => x.classList.remove('sel'));
