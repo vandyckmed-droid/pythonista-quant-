@@ -101,6 +101,20 @@ def adjusted_history(symbol, from_date=None):
     return [r["date"] for r in rows], [round(float(r["adjClose"]), 4) for r in rows]
 
 
+def adjusted_history_with_volume(symbol, from_date=None):
+    """Like adjusted_history, but also returns each day's volume - the same
+    endpoint already carries it; nothing extra to fetch."""
+    params = {"symbol": symbol}
+    if from_date:
+        params["from"] = from_date
+    rows = get("historical-price-eod/dividend-adjusted", **params)
+    rows = sorted(rows, key=lambda r: r["date"])
+    dates = [r["date"] for r in rows]
+    closes = [round(float(r["adjClose"]), 4) for r in rows]
+    volumes = [r.get("volume") or 0 for r in rows]
+    return dates, closes, volumes
+
+
 def load_json(path, default=None):
     try:
         with open(path) as f:
