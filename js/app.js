@@ -153,6 +153,7 @@ async function renderWatchlist() {
   for (let a = 0; a < n; a++) {
     cells += `<div class="corr-lab side">${hSyms[a].slice(0, 4)}</div>`;
     for (let b = 0; b < n; b++) {
+      if (b > a) { cells += `<div></div>`; continue; }  // lower triangle only
       const v = corr[clusterOrder[a]][clusterOrder[b]];
       cells += `<div class="corr-cell" data-i="${clusterOrder[a]}" data-j="${clusterOrder[b]}" style="background:${corrColor(v)}"></div>`;
     }
