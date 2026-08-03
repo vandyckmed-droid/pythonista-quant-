@@ -1,0 +1,12 @@
+{
+  "lastScreen": "2026-07-20T13:05:00Z",
+  "lastUpdate": "2026-07-31T21:10:00Z",
+  "pricesThrough": "2026-07-31",
+  "window": {
+    "far": 200,
+    "near": 20
+  },
+  "universeScanned": 1500,
+  "members": 154,
+  "fake": true
+}
