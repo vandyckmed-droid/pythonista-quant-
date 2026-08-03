@@ -394,15 +394,33 @@ async function boot() {
   renderScreen();
 }
 
-// when the app comes back to the foreground, reload if fresher data exists
-document.addEventListener('visibilitychange', async () => {
-  if (document.visibilityState !== 'visible' || !state.meta) return;
+// Keep the app current without a refresh button: check both for newer data
+// AND for a newer published build (UI-only changes don't touch meta.json).
+const runningBuild = document.querySelector('meta[name="build"]')?.content || '';
+
+async function checkForUpdates() {
   try {
-    const m = await fetch('data/meta.json', { cache: 'no-store' }).then(r => r.json());
-    if (m.lastUpdate !== state.meta.lastUpdate || m.lastScreen !== state.meta.lastScreen) {
-      location.reload();
-    }
+    const [ver, m] = await Promise.all([
+      fetch('version.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).catch(() => null),
+      state.meta
+        ? fetch('data/meta.json', { cache: 'no-store' }).then(r => r.json()).catch(() => null)
+        : null,
+    ]);
+    const newBuild = ver && runningBuild && ver.build !== runningBuild;
+    const newData = m && state.meta &&
+      (m.lastUpdate !== state.meta.lastUpdate || m.lastScreen !== state.meta.lastScreen);
+    if (!newBuild && !newData) return;
+    // Only auto-reload once per target version — a stubbornly cached index.html
+    // would otherwise reload forever without ever picking up the new build.
+    const target = `${ver?.build || ''}|${m?.lastUpdate || ''}`;
+    if (sessionStorage.getItem('reloadedFor') === target) return;
+    sessionStorage.setItem('reloadedFor', target);
+    location.reload();
   } catch { /* offline — keep showing what we have */ }
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') checkForUpdates();
 });
 
-boot();
+boot().then(() => checkForUpdates());
