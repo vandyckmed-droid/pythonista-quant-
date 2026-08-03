@@ -191,7 +191,11 @@ body {
   display: flex; align-items: center; justify-content: center;
   font-size: 9.5px; font-weight: 700; color: var(--muted);
 }
-.corr-lab.side { justify-content: flex-end; padding-right: 4px; width: 44px; }
+.corr-lab.side {
+  justify-content: flex-end; padding-right: 4px; width: 44px;
+  position: sticky; left: 0; z-index: 2;
+  background: linear-gradient(to right, var(--page) 82%, transparent);
+}
 .corr-legend {
   display: flex; flex-wrap: wrap; gap: 10px 14px; padding: 12px 2px 0;
 }
