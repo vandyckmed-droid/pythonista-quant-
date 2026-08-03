@@ -18,6 +18,8 @@ function setupCanvas(canvas) {
 // 21 thin bars of cumulative return since the close just before the window,
 // anchored to a 0% baseline (up green, down red), on a shared percentage
 // scale passed in by the caller so every card in the list is comparable.
+// A bar beyond scaleMax is capped at the edge with a small chevron, rather
+// than silently drawn as if it were the true height.
 export function drawReturnBars(canvas, pctReturns, scaleMax) {
   const { ctx, w, h } = setupCanvas(canvas);
   const n = pctReturns.length;
@@ -27,11 +29,27 @@ export function drawReturnBars(canvas, pctReturns, scaleMax) {
 
   ctx.clearRect(0, 0, w, h);
   pctReturns.forEach((v, i) => {
+    const clipped = Math.abs(v) > scaleMax;
     const clamped = Math.max(-scaleMax, Math.min(scaleMax, v));
     const barH = (Math.abs(clamped) / scaleMax) * zero;
     const x = i * slot + (slot - barW) / 2;
-    ctx.fillStyle = clamped >= 0 ? col('--up') : col('--down');
+    const color = clamped >= 0 ? col('--up') : col('--down');
+    ctx.fillStyle = color;
     ctx.fillRect(x, clamped >= 0 ? zero - barH : zero, barW, barH);
+
+    if (clipped) {
+      const cx = x + barW / 2;
+      const tip = clamped >= 0 ? zero - barH : zero + barH;
+      const dir = clamped >= 0 ? -1 : 1;   // chevron points further outward
+      ctx.beginPath();
+      ctx.moveTo(cx - barW * 0.5, tip - dir * 0.5);
+      ctx.lineTo(cx, tip + dir * 2.5);
+      ctx.lineTo(cx + barW * 0.5, tip - dir * 0.5);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1;
+      ctx.lineJoin = ctx.lineCap = 'round';
+      ctx.stroke();
+    }
   });
 }
 
