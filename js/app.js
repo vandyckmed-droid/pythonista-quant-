@@ -1,4 +1,4 @@
-import { drawSparkline, drawPriceChart, corrColor } from './charts.js';
+import { drawSparkline, drawPriceChart, corrColor, CORR_BUCKETS } from './charts.js';
 import * as risk from './risk.js';
 
 const $ = s => document.querySelector(s);
@@ -145,20 +145,27 @@ async function renderWatchlist() {
     </div>`).join('');
 
   // correlation heatmap, rows/columns in dendrogram (cluster) order so
-  // correlated groups appear as blocks along the diagonal
+  // correlated groups appear as blocks along the diagonal. Lower triangle
+  // only; each column's label rides the staircase, just above its diagonal.
   const n = oSyms.length;
   const hSyms = clusterOrder.map(i => oSyms[i]);
-  let cells = `<div class="corr-lab side"></div>` +
-    hSyms.map(s => `<div class="corr-lab">${s.slice(0, 4)}</div>`).join('');
+  let cells = `<div class="corr-lab side"></div><div class="corr-lab">${hSyms[0].slice(0, 4)}</div>` +
+    '<div></div>'.repeat(n - 1);
   for (let a = 0; a < n; a++) {
     cells += `<div class="corr-lab side">${hSyms[a].slice(0, 4)}</div>`;
     for (let b = 0; b < n; b++) {
-      if (b > a) { cells += `<div></div>`; continue; }  // lower triangle only
+      if (b > a) {
+        cells += b === a + 1 ? `<div class="corr-lab">${hSyms[b].slice(0, 4)}</div>` : `<div></div>`;
+        continue;
+      }
       const v = corr[clusterOrder[a]][clusterOrder[b]];
       cells += `<div class="corr-cell" data-i="${clusterOrder[a]}" data-j="${clusterOrder[b]}" style="background:${corrColor(v)}"></div>`;
     }
   }
-  heatEl.innerHTML = `<div class="corr-grid" style="grid-template-columns:44px repeat(${n},34px)">${cells}</div>`;
+  const legend = CORR_BUCKETS.map(b =>
+    `<span class="corr-key"><span class="corr-swatch" style="background:${b.color}"></span>${b.label}</span>`).join('');
+  heatEl.innerHTML = `<div class="corr-grid" style="grid-template-columns:44px repeat(${n},34px)">${cells}</div>` +
+    `<div class="corr-legend">${legend}</div>`;
   heatEl.querySelectorAll('.corr-cell').forEach(c => {
     c.addEventListener('click', () => {
       heatEl.querySelectorAll('.corr-cell.sel').forEach(x => x.classList.remove('sel'));
