@@ -9,6 +9,7 @@ history files are removed.
 """
 
 import datetime as dt
+import re
 import sys
 
 import fmp
@@ -16,6 +17,21 @@ import fmp
 # how far down the score ranking to check history depth; comfortably clears
 # STAY so the eligible ranking is complete wherever membership can reach
 CANDIDATE_POOL = 320
+
+_SUFFIX_RE = re.compile(
+    r"\b(incorporated|inc|corporation|corp|company|co|limited|ltd|llc|plc|"
+    r"holdings?|group|lp)\b")
+_TRAILING_CONNECTOR_RE = re.compile(r"[&,]+\s*$")
+
+
+def normalize_company_name(name):
+    """Collapse legal-suffix variants of the same company to one key, so e.g.
+    'Victoria's Secret & Co.' and 'Victoria's Secret & Company' are recognised
+    as the same business instead of quietly occupying two list slots."""
+    s = name.lower().replace(".", "").replace(",", "")
+    s = _SUFFIX_RE.sub("", s)
+    s = _TRAILING_CONNECTOR_RE.sub("", s)
+    return re.sub(r"\s+", " ", s).strip()
 
 
 def build_universe():
@@ -41,8 +57,10 @@ def build_universe():
             continue
         if "." in sym or "+" in sym or "=" in sym or len(sym) > 6:
             continue
-        # one share class per company: keep the largest market cap
-        key = low
+        # one share class per company: keep the largest market cap. Matched on
+        # a normalized name (legal suffix and punctuation stripped) so e.g.
+        # "Victoria's Secret & Co." and "... & Company" collapse to one entry.
+        key = normalize_company_name(name)
         if key not in seen_company or cap > seen_company[key]["marketCap"]:
             seen_company[key] = r
     uni = sorted(seen_company.values(), key=lambda r: -r["marketCap"])[:fmp.UNIVERSE_SIZE]
