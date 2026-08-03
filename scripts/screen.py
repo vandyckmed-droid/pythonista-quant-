@@ -128,6 +128,7 @@ def main():
             f.unlink()
 
     fmp.save_json(fmp.DATA / "screen.json", {"members": members})
+    fmp.fetch_benchmark(five_years_ago)
     fmp.build_risk_file(members)
     fmp.archive_screen(members)
     fmp.save_json(fmp.DATA / "meta.json", {
