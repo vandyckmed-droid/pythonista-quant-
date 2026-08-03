@@ -207,6 +207,16 @@ body {
 .corr-swatch {
   width: 12px; height: 12px; border-radius: 4px; display: inline-block;
 }
+#corr-pairs { padding: 4px 16px 20px; display: flex; flex-direction: column; gap: 7px; }
+.pair-row {
+  display: grid; grid-template-columns: 16px 1fr auto; align-items: center; gap: 10px;
+}
+.pair-syms { font-size: 14px; font-weight: 600; }
+.pair-val { font-size: 13.5px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.pairs-more { align-self: flex-start; margin-top: 6px; }
+
+.volline { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
 .corr-readout {
   padding: 8px 16px 20px; font-size: 13.5px; font-weight: 600; color: var(--ink-2);
   min-height: 20px;
