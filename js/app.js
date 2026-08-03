@@ -28,9 +28,12 @@ function saveWatchlist() {
   localStorage.setItem('watchlist', JSON.stringify([...state.watchlist]));
 }
 
+// always revalidate data with the server — home-screen apps cache hard
+const FRESH = { cache: 'no-cache' };
+
 async function fetchHistory(sym) {
   if (!state.histories.has(sym)) {
-    const r = await fetch(`data/history/${sym}.json`);
+    const r = await fetch(`data/history/${sym}.json`, FRESH);
     state.histories.set(sym, await r.json());
   }
   return state.histories.get(sym);
@@ -353,8 +356,8 @@ function wireEvents() {
 async function boot() {
   $('#screen-list').innerHTML = `<div class="loading">Loading…</div>`;
   const [meta, screen] = await Promise.all([
-    fetch('data/meta.json').then(r => r.json()),
-    fetch('data/screen.json').then(r => r.json()),
+    fetch('data/meta.json', FRESH).then(r => r.json()),
+    fetch('data/screen.json', FRESH).then(r => r.json()),
   ]);
   state.meta = meta;
   state.members = screen.members;
@@ -363,5 +366,16 @@ async function boot() {
   wireEvents();
   renderScreen();
 }
+
+// when the app comes back to the foreground, reload if fresher data exists
+document.addEventListener('visibilitychange', async () => {
+  if (document.visibilityState !== 'visible' || !state.meta) return;
+  try {
+    const m = await fetch('data/meta.json', { cache: 'no-store' }).then(r => r.json());
+    if (m.lastUpdate !== state.meta.lastUpdate || m.lastScreen !== state.meta.lastScreen) {
+      location.reload();
+    }
+  } catch { /* offline — keep showing what we have */ }
+});
 
 boot();

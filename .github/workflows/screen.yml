@@ -31,6 +31,8 @@ jobs:
             git pull --rebase -X theirs origin main
             git push origin HEAD:main
           fi
+      - name: Stamp build version into asset URLs
+        run: sed -i "s/__BUILD__/${GITHUB_SHA:0:8}/g" index.html
       - name: Publish site
         uses: peaceiris/actions-gh-pages@v4
         with:
