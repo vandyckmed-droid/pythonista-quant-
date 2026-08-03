@@ -591,14 +591,18 @@ function wireEvents() {
 }
 
 // One fixed percentage axis for every 21D bar chart in the app, so bar
-// heights are directly comparable card to card. Set from the single widest
-// move across all members, rounded up to a clean 5% step.
+// heights are directly comparable card to card. A pure max would let a
+// single extreme mover flatten every other card, and offers no protection
+// if a future one is far more extreme still — so the scale is set from the
+// 90th percentile of each member's own widest move, rounded up to a clean 5%
+// step. The rare name beyond that draws clipped, with a small chevron marking
+// it as capped rather than silently understating it.
 function spark21Scale(members) {
-  let maxAbs = 0;
-  for (const m of members) {
-    for (const r of returns21D(m.spark)) maxAbs = Math.max(maxAbs, Math.abs(r));
-  }
-  return Math.max(0.05, Math.ceil(maxAbs * 20) / 20);
+  const maxAbsPerMember = members.map(
+    m => Math.max(...returns21D(m.spark).map(Math.abs)));
+  maxAbsPerMember.sort((a, b) => a - b);
+  const p90 = maxAbsPerMember[Math.floor(maxAbsPerMember.length * 0.9)] ?? 0;
+  return Math.max(0.05, Math.ceil(p90 * 20) / 20);
 }
 
 /* ---------------- boot ---------------- */
