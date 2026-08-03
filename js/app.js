@@ -68,6 +68,15 @@ function sortedMembers() {
     const g = state.gain;
     ms.sort((a, b) => (g?.get(b.symbol) ?? -1) - (g?.get(a.symbol) ?? -1)
                       || a.rank - b.rank);
+  } else if (k === 'family') {
+    const cid = m => state.risk?.cluster?.[m.symbol];
+    ms.sort((a, b) => {
+      const ca = cid(a), cb = cid(b);
+      if (ca === undefined && cb === undefined) return a.rank - b.rank;
+      if (ca === undefined) return 1;    // unclassified names sink to the end
+      if (cb === undefined) return -1;
+      return ca - cb || a.rank - b.rank;
+    });
   } else ms.sort((a, b) => a.rank - b.rank);
   return ms;
 }
@@ -122,8 +131,7 @@ function rowHTML(m, showVol = false) {
     </div>`;
 }
 
-function renderList(container, members, showVol = false) {
-  container.innerHTML = members.map(m => rowHTML(m, showVol)).join('');
+function drawRowSparklines(container) {
   requestAnimationFrame(() => {
     container.querySelectorAll('.row').forEach(rowEl => {
       const m = state.bySym.get(rowEl.dataset.sym);
@@ -132,8 +140,34 @@ function renderList(container, members, showVol = false) {
   });
 }
 
+function renderList(container, members, showVol = false) {
+  container.innerHTML = members.map(m => rowHTML(m, showVol)).join('');
+  drawRowSparklines(container);
+}
+
+// same as renderList, but with a header dividing each behaviour family
+function renderGroupedList(container, members) {
+  const R = state.risk;
+  let html = '', lastC;
+  for (const m of members) {
+    const c = R.cluster[m.symbol];
+    if (c !== lastC) {
+      html += c === undefined
+        ? `<div class="fam-group-header">Not enough history to classify</div>`
+        : `<div class="fam-group-header"><span class="fam-dot" ` +
+          `style="background:${FAMILY_COLORS[c % 8]}"></span>${R.clusterNames[c]}</div>`;
+      lastC = c;
+    }
+    html += rowHTML(m);
+  }
+  container.innerHTML = html;
+  drawRowSparklines(container);
+}
+
 function renderScreen() {
-  renderList($('#screen-list'), sortedMembers());
+  const ms = sortedMembers();
+  if (state.sort === 'family' && state.risk) renderGroupedList($('#screen-list'), ms);
+  else renderList($('#screen-list'), ms);
 }
 
 /* ---------------- watchlist ---------------- */
@@ -334,6 +368,34 @@ function suggestOne(btn) {
   setTimeout(() => { el.textContent = '＋ Suggest a name'; }, 2600);
 }
 
+// tap once to arm, tap again within a few seconds to actually clear —
+// no native confirm() dialog, but still a deliberate second action
+function wireClearWatchlist() {
+  const btn = $('#clear-watchlist');
+  let armed = false, timer = null;
+  const reset = () => {
+    armed = false;
+    btn.textContent = 'Clear watchlist';
+    btn.classList.remove('confirm');
+  };
+  btn.addEventListener('click', () => {
+    if (!armed) {
+      armed = true;
+      btn.textContent = 'Tap again to clear';
+      btn.classList.add('confirm');
+      clearTimeout(timer);
+      timer = setTimeout(reset, 3000);
+      return;
+    }
+    clearTimeout(timer);
+    reset();
+    state.watchlist.clear();
+    saveWatchlist();
+    refreshGains();
+    renderWatchlist();
+  });
+}
+
 /* ---------------- detail ---------------- */
 
 let chartGeom = null;
@@ -484,6 +546,7 @@ function wireEvents() {
   $('#detail-star').addEventListener('click', () => toggleStar(state.detail));
   document.querySelectorAll('.suggest-btn').forEach(b =>
     b.addEventListener('click', () => suggestOne(b)));
+  wireClearWatchlist();
 
   const tilt = $('#ew-tilt');
   tilt.value = state.ewTilt;
@@ -542,6 +605,7 @@ async function boot() {
     refreshGains();
   } else {
     document.querySelector('[data-sort="diversify"]')?.remove();
+    document.querySelector('[data-sort="family"]')?.remove();
   }
   renderFreshness();
   wireEvents();

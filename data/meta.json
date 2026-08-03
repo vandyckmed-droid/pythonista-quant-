@@ -1,13 +1,13 @@
 {
-  "lastScreen": "2026-08-03T01:19:36Z",
-  "lastUpdate": "2026-08-03T02:14:23Z",
-  "pricesThrough": "2026-07-31",
+  "lastScreen": "2026-08-03T14:19:27Z",
+  "lastUpdate": "2026-08-03T14:19:27Z",
+  "pricesThrough": "2026-08-03",
   "window": {
     "far": 200,
     "near": 20
   },
   "universeScanned": 1500,
-  "members": 147,
-  "fake": false,
-  "minHistoryDays": 504
+  "members": 159,
+  "minHistoryDays": 504,
+  "fake": false
 }
