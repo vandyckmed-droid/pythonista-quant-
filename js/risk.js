@@ -88,10 +88,11 @@ export function enb(corr) {
 
 // Hierarchical Risk Parity (Lopez de Prado): correlation-distance single-linkage
 // clustering -> quasi-diagonal ordering -> recursive bisection with
-// inverse-variance allocation.
+// inverse-variance allocation. Returns {weights, order}; `order` is the
+// dendrogram leaf order, which also cluster-sorts a correlation heatmap.
 export function hrpWeights(cov, corr) {
   const n = cov.length;
-  if (n === 1) return [1];
+  if (n === 1) return { weights: [1], order: [0] };
 
   const dist = corr.map(row => row.map(c => Math.sqrt(Math.max(0, 0.5 * (1 - c)))));
 
@@ -148,7 +149,7 @@ export function hrpWeights(cov, corr) {
     stack.push(left, right);
   }
   const s = w.reduce((a, b) => a + b, 0);
-  return w.map(x => x / s);
+  return { weights: w.map(x => x / s), order };
 }
 
 export function portfolioVol(cov, w, annualize = 252) {

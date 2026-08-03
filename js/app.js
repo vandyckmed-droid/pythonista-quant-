@@ -123,7 +123,7 @@ async function renderWatchlist() {
   const { rets } = risk.alignedReturns(ordered);
   const cov = risk.covMatrix(rets);
   const corr = risk.corrFromCov(cov);
-  const w = risk.hrpWeights(cov, corr);
+  const { weights: w, order: clusterOrder } = risk.hrpWeights(cov, corr);
   const enbVal = risk.enb(corr);
   const avgC = risk.avgCorrelation(corr);
   const pVol = risk.portfolioVol(cov, w);
@@ -144,15 +144,17 @@ async function renderWatchlist() {
       <div class="hrp-val">${fmt.pct1(wi)}</div>
     </div>`).join('');
 
-  // correlation heatmap
+  // correlation heatmap, rows/columns in dendrogram (cluster) order so
+  // correlated groups appear as blocks along the diagonal
   const n = oSyms.length;
+  const hSyms = clusterOrder.map(i => oSyms[i]);
   let cells = `<div class="corr-lab side"></div>` +
-    oSyms.map(s => `<div class="corr-lab">${s.slice(0, 4)}</div>`).join('');
-  for (let i = 0; i < n; i++) {
-    cells += `<div class="corr-lab side">${oSyms[i].slice(0, 4)}</div>`;
-    for (let j = 0; j < n; j++) {
-      const v = corr[i][j];
-      cells += `<div class="corr-cell" data-i="${i}" data-j="${j}" style="background:${corrColor(v)}"></div>`;
+    hSyms.map(s => `<div class="corr-lab">${s.slice(0, 4)}</div>`).join('');
+  for (let a = 0; a < n; a++) {
+    cells += `<div class="corr-lab side">${hSyms[a].slice(0, 4)}</div>`;
+    for (let b = 0; b < n; b++) {
+      const v = corr[clusterOrder[a]][clusterOrder[b]];
+      cells += `<div class="corr-cell" data-i="${clusterOrder[a]}" data-j="${clusterOrder[b]}" style="background:${corrColor(v)}"></div>`;
     }
   }
   heatEl.innerHTML = `<div class="corr-grid" style="grid-template-columns:44px repeat(${n},34px)">${cells}</div>`;
