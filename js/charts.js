@@ -103,12 +103,16 @@ export function drawPriceChart(canvas, dates, values, { scrubIndex = null } = {}
   };
 }
 
-// Diverging blue <-> red heatmap color for correlation in [-1, 1],
-// through the neutral dark midpoint.
+// Bucketed correlation color — five discrete steps read faster than a
+// continuous gradient. Anything below 0.2 (including negatives) is neutral.
+export const CORR_BUCKETS = [
+  { max: 0.2, color: '#383835', label: '<0.2' },
+  { max: 0.4, color: '#7c4640', label: '0.2–0.4' },
+  { max: 0.6, color: '#d95926', label: '0.4–0.6' },
+  { max: 0.8, color: '#e64545', label: '0.6–0.8' },
+  { max: Infinity, color: '#ff4f86', label: '>0.8' },
+];
+
 export function corrColor(v) {
-  const mid = [0x38, 0x38, 0x35];
-  const pole = v >= 0 ? [0xe6, 0x67, 0x67] : [0x39, 0x87, 0xe5];
-  const t = Math.min(1, Math.abs(v));
-  const c = mid.map((m, i) => Math.round(m + (pole[i] - m) * t));
-  return `rgb(${c[0]},${c[1]},${c[2]})`;
+  return CORR_BUCKETS.find(b => v < b.max || b.max === Infinity).color;
 }
