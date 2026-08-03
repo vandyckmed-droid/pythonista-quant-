@@ -15,6 +15,8 @@ const state = {
   gain: null,        // symbol -> diversification gain, recomputed on change
   sort: 'rank',
   watchlist: new Set(JSON.parse(localStorage.getItem('watchlist') || '[]')),
+  ewTilt: Number(localStorage.getItem('ewTilt') ?? 50),   // % equal weight mixed in
+  wl: null,          // {syms, cov, wHRP} for the current watchlist
   histories: new Map(),      // symbol -> {dates, close}
   detail: null,              // symbol currently shown
   detailRange: 252,
@@ -178,17 +180,11 @@ async function renderWatchlist() {
     <div class="tile"><div class="t-label">Names</div><div class="t-value">${oSyms.length}</div></div>
     <div class="tile"><div class="t-label">Effective bets (ENB)</div><div class="t-value">${enbVal.toFixed(1)}</div></div>
     <div class="tile"><div class="t-label">Average correlation</div><div class="t-value">${fmt.num(avgC)}</div></div>
-    <div class="tile"><div class="t-label">HRP portfolio volatility</div><div class="t-value">${fmt.pct1(pVol)}</div></div>`;
+    <div class="tile"><div class="t-label">Portfolio volatility</div><div class="t-value" id="tile-vol">${fmt.pct1(pVol)}</div></div>`;
 
-  // HRP weights, largest first
-  const pairs = oSyms.map((s, i) => [s, w[i]]).sort((a, b) => b[1] - a[1]);
-  const maxW = pairs[0][1];
-  hrpEl.innerHTML = pairs.map(([s, wi]) => `
-    <div class="hrp-row">
-      <div class="hrp-sym">${s}</div>
-      <div class="hrp-track"><div class="hrp-fill" style="width:${(wi / maxW * 100).toFixed(1)}%"></div></div>
-      <div class="hrp-val">${fmt.pct1(wi)}</div>
-    </div>`).join('');
+  // keep the inputs so the tilt slider can re-weight without refetching
+  state.wl = { syms: oSyms, cov, wHRP: w };
+  renderWeights();
 
   // correlation heatmap, rows/columns in dendrogram (cluster) order so
   // correlated groups appear as blocks along the diagonal. Lower triangle
@@ -245,6 +241,40 @@ async function renderWatchlist() {
       $('#corr-readout').textContent = `${oSyms[i]} × ${oSyms[j]}: ${corr[i][j].toFixed(2)}`;
     });
   });
+}
+
+// Blend HRP with equal weight. HRP concentrates wherever the estimates favour
+// a name, and those estimates are noisy — equal weight is the humble baseline
+// that's famously hard to beat out of sample. tilt = how much of it to mix in.
+function blendedWeights() {
+  const { syms, wHRP } = state.wl;
+  const t = state.ewTilt / 100;
+  const eq = 1 / syms.length;
+  return wHRP.map(x => (1 - t) * x + t * eq);
+}
+
+function renderWeights() {
+  if (!state.wl) return;
+  const { syms, cov } = state.wl;
+  const w = blendedWeights();
+  const vol = risk.portfolioVol(cov, w);
+
+  const pairs = syms.map((s, i) => [s, w[i]]).sort((a, b) => b[1] - a[1]);
+  const maxW = pairs[0][1];
+  $('#hrp-bars').innerHTML = pairs.map(([s, wi]) => `
+    <div class="hrp-row">
+      <div class="hrp-sym">${s}</div>
+      <div class="hrp-track"><div class="hrp-fill" style="width:${(wi / maxW * 100).toFixed(1)}%"></div></div>
+      <div class="hrp-val">${fmt.pct1(wi)}</div>
+    </div>`).join('');
+
+  const volEl = $('#tile-vol');
+  if (volEl) volEl.textContent = fmt.pct1(vol);
+  $('#ew-tilt-label').innerHTML = state.ewTilt === 0
+    ? `Pure HRP · largest ${fmt.pct1(maxW)}`
+    : state.ewTilt === 100
+      ? `Equal weight · every name ${fmt.pct1(maxW)}`
+      : `${state.ewTilt}% equal weight · largest ${fmt.pct1(maxW)}`;
 }
 
 function renderFamilyCoverage(syms) {
@@ -436,6 +466,14 @@ function wireEvents() {
   $('#detail-star').addEventListener('click', () => toggleStar(state.detail));
   document.querySelectorAll('.suggest-btn').forEach(b =>
     b.addEventListener('click', () => suggestOne(b)));
+
+  const tilt = $('#ew-tilt');
+  tilt.value = state.ewTilt;
+  tilt.addEventListener('input', () => {
+    state.ewTilt = Number(tilt.value);
+    localStorage.setItem('ewTilt', state.ewTilt);
+    renderWeights();
+  });
 
   $('#range-chips').addEventListener('click', e => {
     const chip = e.target.closest('.chip');

@@ -175,6 +175,34 @@ body {
 .chart-tip .tip-date { color: var(--muted); font-weight: 500; margin-right: 6px; }
 
 /* ---------- HRP bars ---------- */
+.tilt-row { padding: 2px 16px 10px; }
+.tilt-label {
+  font-size: 12.5px; color: var(--muted); margin-top: 4px;
+  font-variant-numeric: tabular-nums;
+}
+#ew-tilt {
+  -webkit-appearance: none; appearance: none;
+  width: 100%; height: 26px; background: none; cursor: pointer;
+}
+#ew-tilt::-webkit-slider-runnable-track {
+  height: 6px; border-radius: 3px;
+  background: linear-gradient(to right, var(--blue), var(--surface-2));
+}
+#ew-tilt::-moz-range-track {
+  height: 6px; border-radius: 3px;
+  background: linear-gradient(to right, var(--blue), var(--surface-2));
+}
+#ew-tilt::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 24px; height: 24px; border-radius: 50%; margin-top: -9px;
+  background: var(--ink); border: 3px solid var(--page);
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.6);
+}
+#ew-tilt::-moz-range-thumb {
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--ink); border: 3px solid var(--page);
+}
+
 #hrp-bars { padding: 4px 16px; display: flex; flex-direction: column; gap: 9px; }
 .hrp-row { display: grid; grid-template-columns: 58px 1fr 52px; align-items: center; gap: 10px; }
 .hrp-sym { font-size: 13.5px; font-weight: 700; }
