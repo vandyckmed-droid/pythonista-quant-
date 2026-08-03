@@ -57,7 +57,16 @@ Both need the `FMP_API_KEY` repository secret, and both commit the refreshed
   hierarchical-risk-parity (HRP) weights. Computed in the browser; the watchlist
   itself is saved on the device. **Families covered** shows which of the eight
   behaviour families you hold, and **Suggest a name** adds the single best
-  diversifier — one tap at a time, never a bulk auto-fill.
+  diversifier — one tap at a time, never a bulk auto-fill. Weights are HRP
+  blended toward equal weight (slider, default 50%), because HRP alone
+  concentrates on whatever the noisy covariance estimates happen to favour.
+
+The eight families come from clustering each name's behaviour **after removing
+the market**, using VTI (total US market — the universe runs down to $1B, so
+large-cap-only SPY would be the wrong yardstick). The members' own average was
+tried first and rejected: with the screen tilted toward a sector, that average
+is partly a sector factor, and subtracting it erased the structure the families
+exist to show. Only 32% of name-pairs group the same way under the two choices.
 - **Detail** — scrubbable price chart (1M–5Y) and fuller stats per name.
 
 The header always shows when the list was last formed and how fresh prices are.
@@ -69,7 +78,8 @@ index.html, css/, js/     the app (vanilla JS, no build step)
 data/meta.json            refresh timestamps + screen parameters
 data/screen.json          ranked member list with summary stats
 data/history/{SYM}.json   5y of daily adjusted closes per member
-data/risk.json            precomputed correlation matrix + behaviour families
+data/risk.json            precomputed correlation matrix, families, betas
+data/benchmark.json       VTI daily closes — the market factor and benchmark
 data/archive/             point-in-time copy of every screen, for later back-tests
 scripts/fmp.py            shared FMP API helpers (stdlib only)
 scripts/screen.py         the wide screen -> membership, ranks, 5y histories

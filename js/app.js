@@ -180,7 +180,9 @@ async function renderWatchlist() {
     <div class="tile"><div class="t-label">Names</div><div class="t-value">${oSyms.length}</div></div>
     <div class="tile"><div class="t-label">Effective bets (ENB)</div><div class="t-value">${enbVal.toFixed(1)}</div></div>
     <div class="tile"><div class="t-label">Average correlation</div><div class="t-value">${fmt.num(avgC)}</div></div>
-    <div class="tile"><div class="t-label">Portfolio volatility</div><div class="t-value" id="tile-vol">${fmt.pct1(pVol)}</div></div>`;
+    <div class="tile"><div class="t-label">Portfolio volatility</div><div class="t-value" id="tile-vol">${fmt.pct1(pVol)}</div></div>
+    <div class="tile"><div class="t-label">Beta vs ${state.risk?.benchmark || 'market'}</div><div class="t-value" id="tile-beta">—</div></div>
+    <div class="tile"><div class="t-label">Largest weight</div><div class="t-value" id="tile-maxw">—</div></div>`;
 
   // keep the inputs so the tilt slider can re-weight without refetching
   state.wl = { syms: oSyms, cov, wHRP: w };
@@ -270,6 +272,16 @@ function renderWeights() {
 
   const volEl = $('#tile-vol');
   if (volEl) volEl.textContent = fmt.pct1(vol);
+  const maxEl = $('#tile-maxw');
+  if (maxEl) maxEl.textContent = fmt.pct1(maxW);
+  const betaEl = $('#tile-beta');
+  if (betaEl) {
+    const B = state.risk?.beta;
+    const known = B ? syms.filter(s => s in B) : [];
+    betaEl.textContent = known.length === syms.length
+      ? syms.reduce((a, s, i) => a + w[i] * B[s], 0).toFixed(2)
+      : '—';
+  }
   $('#ew-tilt-label').innerHTML = state.ewTilt === 0
     ? `Pure HRP · largest ${fmt.pct1(maxW)}`
     : state.ewTilt === 100
@@ -382,9 +394,15 @@ function renderDetailStats() {
   const m = state.bySym.get(state.detail);
   const h = state.histories.get(state.detail);
   const yr = h.close.slice(-253);
+  const beta = state.risk?.beta?.[m.symbol];
+  const fam = state.risk && m.symbol in (state.risk.cluster || {})
+    ? state.risk.clusterNames[state.risk.cluster[m.symbol]] : null;
   const stats = [
     ['Momentum rank', `#${m.rank}`],
     ['Score (ret ÷ vol)', fmt.num(m.score)],
+    ...(beta === undefined ? [] :
+        [[`Beta vs ${state.risk.benchmark || 'market'}`, beta.toFixed(2)]]),
+    ...(fam ? [['Family', fam]] : []),
     ['Window return', fmt.pct(m.ret)],
     ['Window volatility', fmt.pct1(m.vol)],
     ['52-week high', `$${fmt.price(Math.max(...yr))}`],

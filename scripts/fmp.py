@@ -26,6 +26,8 @@ HISTORY_YEARS = 5
 MIN_HISTORY_DAYS = 504   # ~2 years; a name with less can't be risk-analyzed,
                          # so it never enters the universe at all
 N_CLUSTERS = 8           # behaviour families shown in the app
+BENCHMARK = "VTI"        # total US market — matches a universe that runs down
+                         # to $1B, unlike large-cap-only SPY
 
 import threading
 
@@ -195,23 +197,50 @@ def _correlation(syms, rets):
     return C
 
 
-def _residuals(syms, rets):
+def fetch_benchmark(from_date):
+    """Store the benchmark's own price history alongside the members."""
+    dates, closes = adjusted_history(BENCHMARK, from_date)
+    save_json(DATA / "benchmark.json",
+              {"symbol": BENCHMARK, "dates": dates, "close": closes})
+    return dates, closes
+
+
+def _benchmark_returns(common):
+    """Benchmark log returns aligned to the members' shared dates, or None."""
+    b = load_json(DATA / "benchmark.json")
+    if not b:
+        return None
+    pos = {d: i for i, d in enumerate(b["dates"])}
+    if not all(d in pos for d in common):
+        print(f"  benchmark {BENCHMARK} missing some member dates — "
+              f"falling back to the internal proxy", file=sys.stderr)
+        return None
+    c = [b["close"][pos[d]] for d in common]
+    return [math.log(c[i] / c[i - 1]) for i in range(1, len(c))]
+
+
+def _residuals(syms, rets, market):
     """Strip the common market move, leaving each name's own behaviour.
 
     Almost everything is positively correlated with the market, which makes raw
     correlations cluster into one giant blob. What distinguishes names — and
     what a "family" should capture — is what's left once the shared move is out.
+
+    Returns (residuals, betas). `market` should be the benchmark's returns; the
+    equal-weight average of the members is a poor stand-in, because a screen
+    tilted toward one sector makes that average partly a sector factor, and
+    subtracting it erases the very structure families are meant to show.
     """
     T = len(rets[syms[0]])
-    mkt = [sum(rets[s][t] for s in syms) / len(syms) for t in range(T)]
-    mm = sum(mkt) / T
-    vm = sum((x - mm) ** 2 for x in mkt) / (T - 1) or 1e-12
-    out = {}
+    mm = sum(market) / T
+    vm = sum((x - mm) ** 2 for x in market) / (T - 1) or 1e-12
+    res, betas = {}, {}
     for s in syms:
         ms = sum(rets[s]) / T
-        beta = sum((rets[s][t] - ms) * (mkt[t] - mm) for t in range(T)) / (T - 1) / vm
-        out[s] = [rets[s][t] - beta * mkt[t] for t in range(T)]
-    return out
+        beta = sum((rets[s][t] - ms) * (market[t] - mm) for t in range(T)) / (T - 1) / vm
+        betas[s] = beta
+        res[s] = [rets[s][t] - beta * market[t] for t in range(T)]
+    return res, betas
 
 
 def _cluster(C, k):
@@ -290,8 +319,13 @@ def build_risk_file(members):
         return
     C = _correlation(syms, rets)
     # families come from residual behaviour; the matrix the app shows stays raw
-    labels = _cluster(_correlation(syms, _residuals(syms, rets)),
-                      min(N_CLUSTERS, len(syms)))
+    market = _benchmark_returns(common)
+    used_benchmark = market is not None
+    if market is None:   # last resort: the members' own average
+        T = len(rets[syms[0]])
+        market = [sum(rets[s][t] for s in syms) / len(syms) for t in range(T)]
+    res, betas = _residuals(syms, rets, market)
+    labels = _cluster(_correlation(syms, res), min(N_CLUSTERS, len(syms)))
 
     tag = {m["symbol"]: (m.get("industry") or "—", m.get("sector") or "—")
            for m in members}
@@ -308,12 +342,15 @@ def build_risk_file(members):
         "corr": [[round(v, 2) for v in row] for row in C],
         "cluster": {syms[i]: labels[i] for i in range(len(syms))},
         "clusterNames": names,
+        "beta": {s: round(betas[s], 2) for s in syms},
+        "benchmark": BENCHMARK if used_benchmark else None,
         "days": len(rets[syms[0]]),
         "from": common[0],
         "to": common[-1],
     })
     sizes = [sum(1 for x in labels if x == c) for c in range(len(names))]
     print(f"  risk.json: {len(syms)} names, {len(rets[syms[0]])} shared days, "
+          f"market factor {BENCHMARK if used_benchmark else 'internal proxy'}, "
           f"families {list(zip(names, sizes))}", file=sys.stderr)
 
 
