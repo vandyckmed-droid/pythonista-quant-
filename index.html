@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0d0d0d">
+<title>Momentum</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-row">
+    <h1 id="view-title">Screen</h1>
+    <div class="freshness" id="freshness"></div>
+  </div>
+</header>
+
+<main id="main">
+
+  <!-- Ranked list -->
+  <section id="view-screen" class="view">
+    <div class="chips" id="sort-chips">
+      <button class="chip active" data-sort="rank">Rank</button>
+      <button class="chip" data-sort="chg1d">Today</button>
+      <button class="chip" data-sort="ret">Return</button>
+      <button class="chip" data-sort="vol">Volatility</button>
+    </div>
+    <div class="list" id="screen-list"></div>
+  </section>
+
+  <!-- Watchlist -->
+  <section id="view-watchlist" class="view hidden">
+    <div id="watchlist-empty" class="empty hidden">
+      <p>No names yet.</p>
+      <p class="sub">Tap the ☆ on any stock in the Screen tab to build your watchlist.</p>
+    </div>
+    <div id="watchlist-body">
+      <div class="list" id="watchlist-list"></div>
+      <h2 class="section-title">Portfolio risk</h2>
+      <p class="section-sub">Equal focus on your watchlist names, 5-year daily history.</p>
+      <div class="tiles" id="risk-tiles"></div>
+      <h2 class="section-title">HRP weights</h2>
+      <p class="section-sub">Hierarchical risk parity — how a risk-balanced allocation would split.</p>
+      <div id="hrp-bars"></div>
+      <h2 class="section-title">Correlation</h2>
+      <p class="section-sub">Daily returns, full common history. Tap a cell for the value.</p>
+      <div id="corr-heatmap"></div>
+      <div id="corr-readout" class="corr-readout">&nbsp;</div>
+    </div>
+  </section>
+
+  <!-- Detail overlay -->
+  <section id="view-detail" class="view detail hidden">
+    <div class="detail-head">
+      <button class="back" id="detail-back">‹ Back</button>
+      <button class="star big" id="detail-star">☆</button>
+    </div>
+    <div class="detail-title">
+      <div class="sym" id="d-sym"></div>
+      <div class="name" id="d-name"></div>
+    </div>
+    <div class="hero">
+      <div class="hero-price" id="d-price"></div>
+      <div class="hero-delta" id="d-delta"></div>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="d-chart"></canvas>
+      <div class="chart-tip hidden" id="d-tip"></div>
+    </div>
+    <div class="chips ranges" id="range-chips">
+      <button class="chip" data-range="21">1M</button>
+      <button class="chip" data-range="63">3M</button>
+      <button class="chip" data-range="126">6M</button>
+      <button class="chip active" data-range="252">1Y</button>
+      <button class="chip" data-range="0">5Y</button>
+    </div>
+    <div class="tiles" id="d-stats"></div>
+  </section>
+
+</main>
+
+<nav class="tabbar">
+  <button class="tab active" data-view="screen">
+    <span class="tab-ico">▤</span><span>Screen</span>
+  </button>
+  <button class="tab" data-view="watchlist">
+    <span class="tab-ico">★</span><span>Watchlist</span>
+  </button>
+</nav>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
