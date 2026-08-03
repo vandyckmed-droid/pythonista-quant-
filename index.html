@@ -50,8 +50,12 @@
       <h2 class="section-title">Portfolio risk</h2>
       <p class="section-sub">Equal focus on your watchlist names, 5-year daily history.</p>
       <div class="tiles" id="risk-tiles"></div>
-      <h2 class="section-title">HRP weights</h2>
-      <p class="section-sub">Hierarchical risk parity — how a risk-balanced allocation would split.</p>
+      <h2 class="section-title">Suggested weights</h2>
+      <p class="section-sub">Hierarchical risk parity, blended toward equal weight. HRP alone can pile into one name; the slider controls how much it's allowed to.</p>
+      <div class="tilt-row">
+        <input type="range" id="ew-tilt" min="0" max="100" step="5" value="50">
+        <div class="tilt-label" id="ew-tilt-label"></div>
+      </div>
       <div id="hrp-bars"></div>
       <h2 class="section-title">Correlation</h2>
       <p class="section-sub">Daily returns, full common history, grouped by similarity. Tap a cell for the value.</p>
