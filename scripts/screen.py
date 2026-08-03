@@ -13,10 +13,14 @@ import sys
 
 import fmp
 
+# how far down the score ranking to check history depth; comfortably clears
+# STAY so the eligible ranking is complete wherever membership can reach
+CANDIDATE_POOL = 320
+
 
 def build_universe():
     rows = fmp.get(
-        "company-screener",
+        "company-screener", _timeout=180,
         marketCapMoreThan=1_000_000_000,
         country="US",
         exchange="NYSE,NASDAQ,AMEX",
@@ -67,14 +71,35 @@ def main():
             "symbol": sym,
             "name": info[sym]["companyName"],
             "sector": info[sym].get("sector") or "—",
+            "industry": info[sym].get("industry") or "—",
             "score": round(score, 4),
             "ret": round(ret, 4),
             "vol": round(vol, 4),
         })
     scored.sort(key=lambda m: -m["score"])
-    for i, m in enumerate(scored):
-        m["rank"] = i + 1
     print(f"scored {len(scored)} names", file=sys.stderr)
+
+    # Deep history only for names that could plausibly make the list — that's
+    # also where the MIN_HISTORY_DAYS test happens, so a name too new to be
+    # risk-analysed never enters the ranking at all.
+    pool = scored[:CANDIDATE_POOL]
+    fullh = fmp.fetch_many([m["symbol"] for m in pool],
+                           lambda s: fmp.adjusted_history(s, five_years_ago),
+                           label="5y history")
+    eligible, too_new = [], 0
+    for m in pool:
+        got = fullh.get(m["symbol"])
+        if not got:
+            continue
+        if len(got[1]) < fmp.MIN_HISTORY_DAYS:
+            too_new += 1
+            continue
+        eligible.append(m)
+    print(f"eligible: {len(eligible)} of {len(pool)} candidates "
+          f"({too_new} too new for {fmp.MIN_HISTORY_DAYS} trading days)", file=sys.stderr)
+
+    for i, m in enumerate(eligible):
+        m["rank"] = i + 1
 
     # hysteresis against previous membership (ignore sample data)
     prev_meta = fmp.load_json(fmp.DATA / "meta.json", {}) or {}
@@ -83,20 +108,12 @@ def main():
     if not prev_meta.get("fake"):
         prev_members = {m["symbol"] for m in prev.get("members", [])}
 
-    members = [m for m in scored
+    members = [m for m in eligible
                if m["rank"] <= fmp.KEEP
                or (m["symbol"] in prev_members and m["rank"] <= fmp.STAY)]
     print(f"membership: {len(members)} "
           f"({len([m for m in members if m['symbol'] not in prev_members])} new)",
           file=sys.stderr)
-
-    # store 5y history for entrants; refresh members' files to today
-    def full_history(sym):
-        return fmp.adjusted_history(sym, five_years_ago)
-
-    fullh = fmp.fetch_many([m["symbol"] for m in members], full_history,
-                           label="5y history")
-    members = [m for m in members if m["symbol"] in fullh]
     last_dates = []
     for m in members:
         dates, closes = fullh[m["symbol"]]
@@ -111,6 +128,8 @@ def main():
             f.unlink()
 
     fmp.save_json(fmp.DATA / "screen.json", {"members": members})
+    fmp.build_risk_file(members)
+    fmp.archive_screen(members)
     fmp.save_json(fmp.DATA / "meta.json", {
         "lastScreen": fmp.now_iso(),
         "lastUpdate": fmp.now_iso(),
@@ -118,6 +137,7 @@ def main():
         "window": {"far": fmp.WINDOW_FAR, "near": fmp.WINDOW_NEAR},
         "universeScanned": len(uni),
         "members": len(members),
+        "minHistoryDays": fmp.MIN_HISTORY_DAYS,
         "fake": False,
     }, compact=False)
     print(f"done: {len(members)} members, prices through {max(last_dates)}")

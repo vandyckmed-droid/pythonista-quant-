@@ -7,6 +7,7 @@
     "near": 20
   },
   "universeScanned": 1500,
-  "members": 152,
-  "fake": false
+  "members": 147,
+  "fake": false,
+  "minHistoryDays": 504
 }

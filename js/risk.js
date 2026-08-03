@@ -167,6 +167,59 @@ export function avgCorrelation(corr) {
   return s / c;
 }
 
+// --- precomputed-matrix helpers (data/risk.json) -------------------------
+// These let the app answer "does this name add anything?" for all 150
+// candidates instantly, without loading a single history file.
+
+export function subCorr(R, syms) {
+  const ix = syms.map(s => R.index.get(s));
+  return ix.map(i => ix.map(j => R.corr[i][j]));
+}
+
+// Effective bets for a set of symbols, straight from the stored matrix.
+export function enbOf(R, syms) {
+  const known = syms.filter(s => R.index.has(s));
+  if (known.length < 2) return known.length;
+  return enb(subCorr(R, known));
+}
+
+// How much each candidate would add to the effective bets of `held`.
+// Returns {gain: Map symbol -> value, unit: 'bets' | 'independence'}.
+// With fewer than two names held there is no meaningful "extra bet" to measure,
+// so candidates are ranked by how little they resemble the universe at large.
+export function diversificationGain(R, held) {
+  const gain = new Map();
+  if (held.length < 2) {
+    const n = R.symbols.length;
+    for (let i = 0; i < n; i++) {
+      const s = R.symbols[i];
+      if (held.includes(s)) continue;
+      let sum = 0;
+      for (let j = 0; j < n; j++) if (j !== i) sum += R.corr[i][j];
+      gain.set(s, 1 - sum / (n - 1));
+    }
+    return { gain, unit: 'independence' };
+  }
+  const base = enbOf(R, held);
+  for (const s of R.symbols) {
+    if (held.includes(s)) continue;
+    gain.set(s, enbOf(R, [...held, s]) - base);
+  }
+  return { gain, unit: 'bets' };
+}
+
+// Closest already-held name, for the redundancy flag.
+export function nearestHeld(R, sym, held) {
+  if (!R.index.has(sym)) return null;
+  let best = null;
+  for (const h of held) {
+    if (h === sym || !R.index.has(h)) continue;
+    const v = R.corr[R.index.get(sym)][R.index.get(h)];
+    if (!best || v > best.corr) best = { symbol: h, corr: v };
+  }
+  return best;
+}
+
 export function maxDrawdown(closes) {
   let peak = closes[0], mdd = 0;
   for (const p of closes) {

@@ -3,10 +3,16 @@ import * as risk from './risk.js';
 
 const $ = s => document.querySelector(s);
 
+// eight validated categorical hues, one per behaviour family
+const FAMILY_COLORS = ['#3987e5', '#d95926', '#199e70', '#c98500',
+                       '#d55181', '#008300', '#9085e9', '#e66767'];
+
 const state = {
   meta: null,
   members: [],
   bySym: new Map(),
+  risk: null,        // {symbols, corr, index, cluster, clusterNames}
+  gain: null,        // symbol -> diversification gain, recomputed on change
   sort: 'rank',
   watchlist: new Set(JSON.parse(localStorage.getItem('watchlist') || '[]')),
   histories: new Map(),      // symbol -> {dates, close}
@@ -53,22 +59,56 @@ function renderFreshness() {
 function sortedMembers() {
   const ms = [...state.members];
   const k = state.sort;
-  if (k === 'rank') ms.sort((a, b) => a.rank - b.rank);
-  else if (k === 'chg1d') ms.sort((a, b) => b.chg1d - a.chg1d);
+  if (k === 'chg1d') ms.sort((a, b) => b.chg1d - a.chg1d);
   else if (k === 'ret') ms.sort((a, b) => b.ret - a.ret);
   else if (k === 'vol') ms.sort((a, b) => a.vol - b.vol);
+  else if (k === 'diversify') {
+    const g = state.gain;
+    ms.sort((a, b) => (g?.get(b.symbol) ?? -1) - (g?.get(a.symbol) ?? -1)
+                      || a.rank - b.rank);
+  } else ms.sort((a, b) => a.rank - b.rank);
   return ms;
+}
+
+// what each candidate would add to the effective bets of the current watchlist
+function refreshGains() {
+  if (!state.risk) { state.gain = null; return; }
+  const held = [...state.watchlist].filter(s => state.risk.index.has(s));
+  const { gain, unit } = risk.diversificationGain(state.risk, held);
+  state.gain = gain;
+  state.gainUnit = unit;
+}
+
+function familyDot(sym) {
+  const R = state.risk;
+  if (!R || !(sym in R.cluster)) return '';
+  const c = R.cluster[sym];
+  return `<span class="fam-dot" style="background:${FAMILY_COLORS[c % 8]}" ` +
+         `title="${R.clusterNames[c]}"></span>`;
+}
+
+// "≈ MU 0.75" when a name closely tracks something already held
+function redundancyTag(sym) {
+  if (!state.risk || state.watchlist.has(sym)) return '';
+  const near = risk.nearestHeld(state.risk, sym, [...state.watchlist]);
+  if (!near || near.corr < 0.6) return '';
+  return `<div class="dupe">≈ ${near.symbol} ${near.corr.toFixed(2)}</div>`;
 }
 
 function rowHTML(m, showVol = false) {
   const dir = m.chg1d >= 0 ? 'up' : 'down';
   const starred = state.watchlist.has(m.symbol);
+  const gain = state.sort === 'diversify' && state.gainUnit === 'bets'
+      && state.gain?.has(m.symbol)
+    ? `<div class="gain">+${state.gain.get(m.symbol).toFixed(2)} bets</div>`
+    : '';
   return `
     <div class="row" data-sym="${m.symbol}">
       <div class="rank">${m.rank}</div>
       <div class="id">
-        <div class="sym">${m.symbol}</div>
+        <div class="sym">${familyDot(m.symbol)}${m.symbol}</div>
         <div class="name">${m.name}</div>
+        ${gain || redundancyTag(m.symbol)}
       </div>
       <canvas class="spark"></canvas>
       <div class="px">
@@ -105,6 +145,7 @@ async function renderWatchlist() {
 
   const members = syms.map(s => state.bySym.get(s)).sort((a, b) => a.rank - b.rank);
   renderList($('#watchlist-list'), members, true);
+  renderFamilyCoverage(syms);
 
   const tiles = $('#risk-tiles');
   const hrpEl = $('#hrp-bars');
@@ -206,6 +247,51 @@ async function renderWatchlist() {
   });
 }
 
+function renderFamilyCoverage(syms) {
+  const R = state.risk;
+  const el = $('#family-coverage');
+  if (!R) { el.innerHTML = ''; return; }
+  const held = new Map();
+  for (const s of syms) {
+    const c = R.cluster[s];
+    if (c === undefined) continue;
+    held.set(c, (held.get(c) || 0) + 1);
+  }
+  el.innerHTML = R.clusterNames.map((nm, c) => {
+    const n = held.get(c) || 0;
+    return `<div class="fam-row ${n ? '' : 'uncovered'}">
+      <span class="fam-dot" style="background:${FAMILY_COLORS[c % 8]}"></span>
+      <span class="fam-name">${nm}</span>
+      <span class="fam-count">${n || '—'}</span>
+    </div>`;
+  }).join('');
+  const covered = held.size;
+  el.insertAdjacentHTML('afterbegin',
+    `<div class="fam-head">${covered} of ${R.clusterNames.length} families</div>`);
+}
+
+// add the single name that most improves effective bets — one tap, reversible
+function suggestOne(btn) {
+  if (!state.risk) return;
+  refreshGains();
+  let best = null;
+  for (const [sym, g] of state.gain) {
+    if (!state.bySym.has(sym)) continue;
+    if (!best || g > best.g) best = { sym, g };
+  }
+  if (!best) return;
+  const unit = state.gainUnit;
+  state.watchlist.add(best.sym);
+  saveWatchlist();
+  refreshGains();
+  renderWatchlist();
+  const el = document.querySelector('#watchlist-body .suggest-btn') || btn;
+  el.textContent = unit === 'bets'
+    ? `Added ${best.sym} (+${best.g.toFixed(2)} bets)`
+    : `Added ${best.sym}`;
+  setTimeout(() => { el.textContent = '＋ Suggest a name'; }, 2600);
+}
+
 /* ---------------- detail ---------------- */
 
 let chartGeom = null;
@@ -305,6 +391,7 @@ function toggleStar(sym) {
   if (state.watchlist.has(sym)) state.watchlist.delete(sym);
   else state.watchlist.add(sym);
   saveWatchlist();
+  refreshGains();   // redundancy flags and gains are relative to what's held
   if (state.view === 'screen') renderScreen();
   if (state.view === 'watchlist') renderWatchlist();
   if (state.view === 'detail') updateStarButton();
@@ -319,6 +406,7 @@ function wireEvents() {
     state.sort = chip.dataset.sort;
     document.querySelectorAll('#sort-chips .chip').forEach(c =>
       c.classList.toggle('active', c === chip));
+    if (state.sort === 'diversify') refreshGains();
     renderScreen();
   });
 
@@ -346,6 +434,8 @@ function wireEvents() {
   });
 
   $('#detail-star').addEventListener('click', () => toggleStar(state.detail));
+  document.querySelectorAll('.suggest-btn').forEach(b =>
+    b.addEventListener('click', () => suggestOne(b)));
 
   $('#range-chips').addEventListener('click', e => {
     const chip = e.target.closest('.chip');
@@ -382,13 +472,21 @@ function wireEvents() {
 
 async function boot() {
   $('#screen-list').innerHTML = `<div class="loading">Loading…</div>`;
-  const [meta, screen] = await Promise.all([
+  const [meta, screen, riskData] = await Promise.all([
     fetch('data/meta.json', FRESH).then(r => r.json()),
     fetch('data/screen.json', FRESH).then(r => r.json()),
+    fetch('data/risk.json', FRESH).then(r => r.ok ? r.json() : null).catch(() => null),
   ]);
   state.meta = meta;
   state.members = screen.members;
   state.members.forEach(m => state.bySym.set(m.symbol, m));
+  if (riskData) {
+    riskData.index = new Map(riskData.symbols.map((s, i) => [s, i]));
+    state.risk = riskData;
+    refreshGains();
+  } else {
+    document.querySelector('[data-sort="diversify"]')?.remove();
+  }
   renderFreshness();
   wireEvents();
   renderScreen();

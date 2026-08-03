@@ -57,6 +57,7 @@ def main():
         last_dates.append(dates[-1])
 
     fmp.save_json(fmp.DATA / "screen.json", {"members": members})
+    fmp.build_risk_file(members)   # correlations move with the new prices
     meta["lastUpdate"] = fmp.now_iso()
     meta["pricesThrough"] = max(last_dates) if last_dates else meta.get("pricesThrough")
     fmp.save_json(fmp.DATA / "meta.json", meta, compact=False)
