@@ -15,22 +15,32 @@ function setupCanvas(canvas) {
   return { ctx, w: rect.width, h: rect.height };
 }
 
-export function drawSparkline(canvas, values) {
+// 21 thin bars of cumulative return since the close just before the window,
+// anchored to a 0% baseline (up green, down red), on a shared percentage
+// scale passed in by the caller so every card in the list is comparable.
+export function drawReturnBars(canvas, pctReturns, scaleMax) {
   const { ctx, w, h } = setupCanvas(canvas);
-  const up = values[values.length - 1] >= values[0];
-  const color = up ? col('--up') : col('--down');
-  const min = Math.min(...values), max = Math.max(...values);
-  const pad = 2, span = max - min || 1;
-  const x = i => pad + (i / (values.length - 1)) * (w - pad * 2);
-  const y = v => h - pad - ((v - min) / span) * (h - pad * 2);
+  const n = pctReturns.length;
+  const zero = h / 2;
+  const slot = w / n;
+  const barW = Math.max(1, slot * 0.6);
 
   ctx.clearRect(0, 0, w, h);
-  ctx.beginPath();
-  values.forEach((v, i) => i ? ctx.lineTo(x(i), y(v)) : ctx.moveTo(x(i), y(v)));
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 1.5;
-  ctx.lineJoin = ctx.lineCap = 'round';
-  ctx.stroke();
+  pctReturns.forEach((v, i) => {
+    const clamped = Math.max(-scaleMax, Math.min(scaleMax, v));
+    const barH = (Math.abs(clamped) / scaleMax) * zero;
+    const x = i * slot + (slot - barW) / 2;
+    ctx.fillStyle = clamped >= 0 ? col('--up') : col('--down');
+    ctx.fillRect(x, clamped >= 0 ? zero - barH : zero, barW, barH);
+  });
+}
+
+// Given a run of raw closes ending today, the 21 daily cumulative-return
+// values since the close just before that 21-trading-day window.
+export function returns21D(closes) {
+  const win = closes.slice(-22);
+  const base = win[0];
+  return win.slice(1).map(c => c / base - 1);
 }
 
 // Price chart with y gridlines, area wash, end-dot; returns a geometry object

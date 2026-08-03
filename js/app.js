@@ -1,4 +1,4 @@
-import { drawSparkline, drawPriceChart, corrColor, CORR_BUCKETS } from './charts.js';
+import { drawReturnBars, returns21D, drawPriceChart, corrColor, CORR_BUCKETS } from './charts.js';
 import * as risk from './risk.js';
 
 const $ = s => document.querySelector(s);
@@ -121,7 +121,10 @@ function rowHTML(m, showVol = false) {
         <div class="name">${m.name}</div>
         ${gain || redundancyTag(m.symbol)}
       </div>
-      <canvas class="spark"></canvas>
+      <div class="spark-wrap">
+        <div class="spark-label">21D</div>
+        <canvas class="spark"></canvas>
+      </div>
       <div class="px">
         <div class="price">${fmt.price(m.price)}</div>
         <div class="chg ${dir}">${fmt.pct(m.chg1d)}</div>
@@ -135,7 +138,7 @@ function drawRowSparklines(container) {
   requestAnimationFrame(() => {
     container.querySelectorAll('.row').forEach(rowEl => {
       const m = state.bySym.get(rowEl.dataset.sym);
-      drawSparkline(rowEl.querySelector('canvas.spark'), m.spark);
+      drawReturnBars(rowEl.querySelector('canvas.spark'), returns21D(m.spark), state.spark21Scale);
     });
   });
 }
@@ -587,6 +590,17 @@ function wireEvents() {
   });
 }
 
+// One fixed percentage axis for every 21D bar chart in the app, so bar
+// heights are directly comparable card to card. Set from the single widest
+// move across all members, rounded up to a clean 5% step.
+function spark21Scale(members) {
+  let maxAbs = 0;
+  for (const m of members) {
+    for (const r of returns21D(m.spark)) maxAbs = Math.max(maxAbs, Math.abs(r));
+  }
+  return Math.max(0.05, Math.ceil(maxAbs * 20) / 20);
+}
+
 /* ---------------- boot ---------------- */
 
 async function boot() {
@@ -599,6 +613,7 @@ async function boot() {
   state.meta = meta;
   state.members = screen.members;
   state.members.forEach(m => state.bySym.set(m.symbol, m));
+  state.spark21Scale = spark21Scale(state.members);
   if (riskData) {
     riskData.index = new Map(riskData.symbols.map((s, i) => [s, i]));
     state.risk = riskData;
