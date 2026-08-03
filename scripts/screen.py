@@ -18,6 +18,23 @@ import fmp
 # STAY so the eligible ranking is complete wherever membership can reach
 CANDIDATE_POOL = 320
 
+# Generous guardrails, not active constraints: on the current list, only the
+# two or three thinnest names sit anywhere near these floors. They exist to
+# stop a genuinely bad name from sneaking in later, not to reshape today's cut.
+PRICE_FLOOR = 5.0                # a low single-digit price invites wide spreads
+COARSE_DOLLAR_VOL_FLOOR = 1e6    # one day's price*volume from the initial pull -
+                                  # noisy (a single day), so kept very loose;
+                                  # only cuts the obviously dead before the
+                                  # expensive per-name history fetch runs
+PRECISE_DOLLAR_VOL_FLOOR = 3e6   # 20-day average price*volume from the
+                                  # momentum-window fetch - the real gate
+
+# A window return or a run of identical closes this extreme is more often a
+# data artifact than genuine signal - logged for a manual look, never excluded
+# automatically, since a few real momentum names legitimately run this hot.
+EXTREME_RET_WARN = 5.0           # +500%
+STALE_STREAK_WARN = 10           # consecutive identical daily closes
+
 _SUFFIX_RE = re.compile(
     r"\b(incorporated|inc|corporation|corp|company|co|limited|ltd|llc|plc|"
     r"holdings?|group|lp)\b")
@@ -34,6 +51,17 @@ def normalize_company_name(name):
     return re.sub(r"\s+", " ", s).strip()
 
 
+_DISPLAY_SUFFIX_RE = re.compile(
+    r"\s+(common stock|common shares|ordinary shares)\s*$", re.I)
+
+
+def clean_display_name(name):
+    """Strip cosmetic security-type suffixes some feeds append to the legal
+    name (e.g. 'BrightSpring Health Services, Inc. Common Stock') - display
+    only, independent of the dedup key above."""
+    return _DISPLAY_SUFFIX_RE.sub("", name).strip()
+
+
 def build_universe():
     rows = fmp.get(
         "company-screener", _timeout=180,
@@ -44,10 +72,12 @@ def build_universe():
         limit=5000,
     )
     junk = ("fund", "trust", "etf", " reit index", "acquisition corp", "holdings iv",
-            "spac", "warrant", "unit ", " units")
+            "spac", "warrant", "unit ", " units",
+            "blank check", "special purpose acquisition")
     seen_company = {}
+    too_cheap = too_illiquid = 0
     for r in rows:
-        name = (r.get("companyName") or "").strip()
+        name = clean_display_name((r.get("companyName") or "").strip())
         sym = r.get("symbol") or ""
         cap = r.get("marketCap") or 0
         if not name or not sym or not cap:
@@ -57,6 +87,16 @@ def build_universe():
             continue
         if "." in sym or "+" in sym or "=" in sym or len(sym) > 6:
             continue
+        price = r.get("price") or 0
+        if price < PRICE_FLOOR:
+            too_cheap += 1
+            continue
+        # coarse and noisy (one day's volume), so deliberately loose - just
+        # cuts the obviously dead before the expensive per-name fetches below
+        if price * (r.get("volume") or 0) < COARSE_DOLLAR_VOL_FLOOR:
+            too_illiquid += 1
+            continue
+        r["companyName"] = name
         # one share class per company: keep the largest market cap. Matched on
         # a normalized name (legal suffix and punctuation stripped) so e.g.
         # "Victoria's Secret & Co." and "... & Company" collapse to one entry.
@@ -64,7 +104,9 @@ def build_universe():
         if key not in seen_company or cap > seen_company[key]["marketCap"]:
             seen_company[key] = r
     uni = sorted(seen_company.values(), key=lambda r: -r["marketCap"])[:fmp.UNIVERSE_SIZE]
-    print(f"universe: {len(rows)} screened -> {len(uni)} after filters", file=sys.stderr)
+    print(f"universe: {len(rows)} screened -> {len(uni)} after filters "
+          f"({too_cheap} under ${PRICE_FLOOR:.0f}, {too_illiquid} under "
+          f"${COARSE_DOLLAR_VOL_FLOOR/1e6:.0f}M coarse volume)", file=sys.stderr)
     return uni
 
 
@@ -77,14 +119,35 @@ def main():
     info = {r["symbol"]: r for r in uni}
 
     # score the whole universe on ~320 calendar days of adjusted closes
-    hist = fmp.fetch_many(list(info), lambda s: fmp.adjusted_history(s, window_start),
+    hist = fmp.fetch_many(list(info),
+                          lambda s: fmp.adjusted_history_with_volume(s, window_start),
                           label="window history")
-    scored = []
-    for sym, (dates, closes) in hist.items():
+    scored, too_illiquid_precise = [], 0
+    for sym, (dates, closes, volumes) in hist.items():
         mom = fmp.momentum(closes)
         if mom is None:
             continue
         score, ret, vol = mom
+
+        # precise liquidity gate: a real 20-day average, not one noisy day
+        recent = min(20, len(closes))
+        dollar_vols = [closes[i] * volumes[i] for i in range(len(closes) - recent, len(closes))]
+        avg_dollar_vol = sum(dollar_vols) / len(dollar_vols) if dollar_vols else 0
+        if avg_dollar_vol < PRECISE_DOLLAR_VOL_FLOOR:
+            too_illiquid_precise += 1
+            continue
+
+        if abs(ret) > EXTREME_RET_WARN:
+            print(f"  note: {sym} window return {ret*100:.0f}% is extreme - "
+                  f"worth a manual look, not auto-excluded", file=sys.stderr)
+        streak = longest = 1
+        for i in range(1, len(closes)):
+            streak = streak + 1 if closes[i] == closes[i - 1] else 1
+            longest = max(longest, streak)
+        if longest >= STALE_STREAK_WARN:
+            print(f"  note: {sym} has {longest} identical consecutive closes - "
+                  f"check for a stale feed", file=sys.stderr)
+
         scored.append({
             "symbol": sym,
             "name": info[sym]["companyName"],
@@ -95,7 +158,8 @@ def main():
             "vol": round(vol, 4),
         })
     scored.sort(key=lambda m: -m["score"])
-    print(f"scored {len(scored)} names", file=sys.stderr)
+    print(f"scored {len(scored)} names ({too_illiquid_precise} excluded under "
+          f"${PRECISE_DOLLAR_VOL_FLOOR/1e6:.0f}M 20-day avg volume)", file=sys.stderr)
 
     # Deep history only for names that could plausibly make the list — that's
     # also where the MIN_HISTORY_DAYS test happens, so a name too new to be
@@ -157,6 +221,8 @@ def main():
         "universeScanned": len(uni),
         "members": len(members),
         "minHistoryDays": fmp.MIN_HISTORY_DAYS,
+        "priceFloor": PRICE_FLOOR,
+        "minAvgDollarVolume": PRECISE_DOLLAR_VOL_FLOOR,
         "fake": False,
     }, compact=False)
     print(f"done: {len(members)} members, prices through {max(last_dates)}")
