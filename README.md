@@ -24,9 +24,14 @@ The app has three views:
 
 ## Current status
 
-UI is complete and running on **generated sample data** shaped exactly like the
-real pipeline output (`scripts/make_fake_data.py`). The live FMP data pipeline
-(screen + update scripts writing `data/`) is the next step.
+Live. `data/` holds real FMP end-of-day data. Refreshes are run by hand from
+the GitHub Actions tab (both need the `FMP_API_KEY` repository secret):
+
+- **Screen (rebuild the 150)** — the wide screen; run every 1–4 weeks.
+- **Update (refresh prices)** — members-only price catch-up; run whenever.
+
+Each workflow commits the refreshed `data/` to `main` and republishes the site.
+`scripts/make_fake_data.py` remains for UI work on sample data.
 
 ## Layout
 
@@ -35,7 +40,9 @@ index.html, css/, js/     the app (vanilla JS, no build step)
 data/meta.json            refresh timestamps + screen parameters
 data/screen.json          ranked member list with summary stats
 data/history/{SYM}.json   5y of daily adjusted closes per member
-scripts/                  data generation (sample now, FMP pipeline next)
+scripts/fmp.py            shared FMP API helpers (stdlib only)
+scripts/screen.py         the wide screen -> membership, ranks, 5y histories
+scripts/update.py         members-only price catch-up
 ```
 
 Deployed automatically to GitHub Pages on every push to `main`.
