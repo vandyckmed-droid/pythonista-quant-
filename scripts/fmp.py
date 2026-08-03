@@ -1,6 +1,7 @@
 """Shared helpers for the FMP data pipeline. Stdlib only."""
 
 import json
+import math
 import os
 import sys
 import time
@@ -22,6 +23,9 @@ KEEP = 150         # enter at rank <= KEEP
 STAY = 195         # members stay until rank > STAY
 UNIVERSE_SIZE = 1500
 HISTORY_YEARS = 5
+MIN_HISTORY_DAYS = 504   # ~2 years; a name with less can't be risk-analyzed,
+                         # so it never enters the universe at all
+N_CLUSTERS = 8           # behaviour families shown in the app
 
 import threading
 
@@ -30,24 +34,24 @@ _last_call = [0.0]
 _MIN_INTERVAL = 0.09   # ~11 req/s, well under premium limits
 
 
-def get(endpoint, **params):
+def get(endpoint, _timeout=60, **params):
     """GET a stable-API endpoint, parsed JSON, with retry and throttling."""
     params["apikey"] = API_KEY
     url = f"{BASE}/{endpoint}?{urllib.parse.urlencode(params)}"
-    for attempt in range(4):
+    for attempt in range(5):
         with _throttle:
             wait = _MIN_INTERVAL - (time.time() - _last_call[0])
             if wait > 0:
                 time.sleep(wait)
             _last_call[0] = time.time()
         try:
-            with urllib.request.urlopen(url, timeout=60) as r:
+            with urllib.request.urlopen(url, timeout=_timeout) as r:
                 body = json.loads(r.read())
             if isinstance(body, dict) and "Error Message" in body:
                 raise RuntimeError(body["Error Message"])
             return body
         except Exception as e:
-            if attempt == 3:
+            if attempt == 4:
                 raise
             time.sleep(2 ** attempt)
 
@@ -147,3 +151,177 @@ def member_summary(m, dates, closes):
 
 def now_iso():
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+
+# ---------------------------------------------------------------------------
+# Correlations and behaviour families, precomputed here so the phone doesn't
+# have to load 150 history files to answer "does this name add anything?"
+# ---------------------------------------------------------------------------
+
+def _aligned_returns(members):
+    """Daily log returns for every member over their shared dates."""
+    hist = {}
+    for m in members:
+        h = load_history(m["symbol"])
+        if h and len(h["dates"]) > 1:
+            hist[m["symbol"]] = h
+    syms = [m["symbol"] for m in members if m["symbol"] in hist]
+    common = set(hist[syms[0]]["dates"])
+    for s in syms[1:]:
+        common &= set(hist[s]["dates"])
+    common = sorted(common)
+
+    rets = {}
+    for s in syms:
+        pos = {d: i for i, d in enumerate(hist[s]["dates"])}
+        c = [hist[s]["close"][pos[d]] for d in common]
+        rets[s] = [math.log(c[i] / c[i - 1]) for i in range(1, len(c))
+                   if c[i] > 0 and c[i - 1] > 0]
+    return syms, rets, common
+
+
+def _correlation(syms, rets):
+    n, T = len(syms), len(rets[syms[0]])
+    mu = {s: sum(rets[s]) / T for s in syms}
+    sd = {s: math.sqrt(sum((x - mu[s]) ** 2 for x in rets[s]) / (T - 1)) or 1e-12
+          for s in syms}
+    C = [[1.0] * n for _ in range(n)]
+    for i in range(n):
+        ri, mi, si = rets[syms[i]], mu[syms[i]], sd[syms[i]]
+        for j in range(i + 1, n):
+            rj, mj, sj = rets[syms[j]], mu[syms[j]], sd[syms[j]]
+            cov = sum((ri[t] - mi) * (rj[t] - mj) for t in range(T)) / (T - 1)
+            C[i][j] = C[j][i] = max(-1.0, min(1.0, cov / (si * sj)))
+    return C
+
+
+def _residuals(syms, rets):
+    """Strip the common market move, leaving each name's own behaviour.
+
+    Almost everything is positively correlated with the market, which makes raw
+    correlations cluster into one giant blob. What distinguishes names — and
+    what a "family" should capture — is what's left once the shared move is out.
+    """
+    T = len(rets[syms[0]])
+    mkt = [sum(rets[s][t] for s in syms) / len(syms) for t in range(T)]
+    mm = sum(mkt) / T
+    vm = sum((x - mm) ** 2 for x in mkt) / (T - 1) or 1e-12
+    out = {}
+    for s in syms:
+        ms = sum(rets[s]) / T
+        beta = sum((rets[s][t] - ms) * (mkt[t] - mm) for t in range(T)) / (T - 1) / vm
+        out[s] = [rets[s][t] - beta * mkt[t] for t in range(T)]
+    return out
+
+
+def _cluster(C, k):
+    """Complete-linkage agglomerative clustering on correlation distance.
+
+    Complete linkage (rather than the single linkage HRP uses internally) keeps
+    the displayed families balanced instead of one blob plus singletons.
+    """
+    n = len(C)
+    d = [[math.sqrt(max(0.0, 0.5 * (1 - C[i][j]))) for j in range(n)] for i in range(n)]
+    groups = {i: [i] for i in range(n)}
+    active = set(range(n))
+    while len(active) > k:
+        bi = bj = None
+        bd = float("inf")
+        for i in active:
+            for j in active:
+                if j <= i:
+                    continue
+                if d[i][j] < bd:
+                    bd, bi, bj = d[i][j], i, j
+        for m in active:
+            if m in (bi, bj):
+                continue
+            d[bi][m] = d[m][bi] = max(d[bi][m], d[bj][m])
+        groups[bi] += groups[bj]
+        del groups[bj]
+        active.discard(bj)
+
+    out = [0] * n
+    # biggest family first, so colour slot 1 is the most common behaviour
+    for cid, members in enumerate(sorted(groups.values(), key=len, reverse=True)):
+        for i in members:
+            out[i] = cid
+    return out
+
+
+def _label_clusters(groups):
+    """Name each family by the sectors its members share, keeping names unique.
+
+    `groups` is a list of (symbols, sectors) in display order.
+    """
+    labels = []
+    for _, tags in groups:
+        # tags is (industry, sector) per member — a shared industry is a much
+        # sharper name than a shared sector ("Semiconductors" beats "Technology")
+        for level in (0, 1):
+            counts = {}
+            for t in tags:
+                counts[t[level]] = counts.get(t[level], 0) + 1
+            ordered = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
+            top, hits = ordered[0]
+            if hits / len(tags) >= 0.4 and top != "—":
+                labels.append(top)
+                break
+        else:
+            labels.append(" & ".join(k for k, _ in ordered[:2]))
+
+    # two families can legitimately share a dominant sector (e.g. two distinct
+    # kinds of healthcare) — disambiguate with the family's largest name
+    seen = {}
+    for i, lab in enumerate(labels):
+        seen.setdefault(lab, []).append(i)
+    for lab, idxs in seen.items():
+        if len(idxs) > 1:
+            for i in idxs:
+                labels[i] = f"{lab} ({groups[i][0][0]})"
+    return labels
+
+
+def build_risk_file(members):
+    """Write data/risk.json: correlation matrix + behaviour families."""
+    syms, rets, common = _aligned_returns(members)
+    if len(syms) < 3 or len(rets[syms[0]]) < 60:
+        print("  not enough shared history for risk.json", file=sys.stderr)
+        return
+    C = _correlation(syms, rets)
+    # families come from residual behaviour; the matrix the app shows stays raw
+    labels = _cluster(_correlation(syms, _residuals(syms, rets)),
+                      min(N_CLUSTERS, len(syms)))
+
+    tag = {m["symbol"]: (m.get("industry") or "—", m.get("sector") or "—")
+           for m in members}
+    rank = {m["symbol"]: m["rank"] for m in members}
+    groups = []
+    for cid in range(max(labels) + 1):
+        mem = sorted((syms[i] for i in range(len(syms)) if labels[i] == cid),
+                     key=lambda s: rank.get(s, 9999))
+        groups.append((mem, [tag[s] for s in mem]))
+    names = _label_clusters(groups)
+
+    save_json(DATA / "risk.json", {
+        "symbols": syms,
+        "corr": [[round(v, 2) for v in row] for row in C],
+        "cluster": {syms[i]: labels[i] for i in range(len(syms))},
+        "clusterNames": names,
+        "days": len(rets[syms[0]]),
+        "from": common[0],
+        "to": common[-1],
+    })
+    sizes = [sum(1 for x in labels if x == c) for c in range(len(names))]
+    print(f"  risk.json: {len(syms)} names, {len(rets[syms[0]])} shared days, "
+          f"families {list(zip(names, sizes))}", file=sys.stderr)
+
+
+def archive_screen(members):
+    """Keep a point-in-time copy of each screen so ranks can be back-tested."""
+    day = time.strftime("%Y-%m-%d", time.gmtime())
+    save_json(DATA / "archive" / f"screen-{day}.json", {
+        "date": day,
+        "members": [{"symbol": m["symbol"], "rank": m["rank"], "score": m["score"]}
+                    for m in members],
+    })
