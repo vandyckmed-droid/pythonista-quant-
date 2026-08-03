@@ -238,6 +238,22 @@ body {
 .corr-swatch {
   width: 12px; height: 12px; border-radius: 4px; display: inline-block;
 }
+/* ---------- group headers ---------- */
+.fam-group-header {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12.5px; font-weight: 700; color: var(--ink-2);
+  text-transform: uppercase; letter-spacing: 0.03em;
+  padding: 12px 4px 2px;
+}
+
+/* ---------- watchlist toolbar ---------- */
+.wl-toolbar { display: flex; justify-content: flex-end; padding: 6px 16px 0; }
+.link-btn {
+  background: none; border: 0; color: var(--muted);
+  font-size: 13px; font-weight: 600; padding: 6px 4px; cursor: pointer;
+}
+.link-btn.confirm { color: var(--down); }
+
 /* ---------- behaviour families ---------- */
 .fam-dot {
   display: inline-block; width: 8px; height: 8px; border-radius: 50%;

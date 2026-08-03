@@ -7,9 +7,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0d0d0d">
 <title>Momentum</title>
-<meta name="build" content="01a7f15e">
+<meta name="build" content="beff4747">
 <link rel="icon" href="data:,">
-<link rel="stylesheet" href="css/styles.css?v=01a7f15e">
+<link rel="stylesheet" href="css/styles.css?v=beff4747">
 </head>
 <body>
 
@@ -26,6 +26,7 @@
   <section id="view-screen" class="view">
     <div class="chips" id="sort-chips">
       <button class="chip active" data-sort="rank">Rank</button>
+      <button class="chip" data-sort="family">Group</button>
       <button class="chip" data-sort="diversify">Diversifies</button>
       <button class="chip" data-sort="chg1d">Today</button>
       <button class="chip" data-sort="ret">Return</button>
@@ -42,6 +43,9 @@
       <button class="chip suggest-btn">＋ Suggest a name</button>
     </div>
     <div id="watchlist-body">
+      <div class="wl-toolbar">
+        <button class="link-btn" id="clear-watchlist">Clear watchlist</button>
+      </div>
       <div class="list" id="watchlist-list"></div>
       <h2 class="section-title">Families covered</h2>
       <p class="section-sub">The 150 group into eight behaviour families. Spreading across them is what lowers risk.</p>
@@ -106,6 +110,6 @@
   </button>
 </nav>
 
-<script type="module" src="js/app.js?v=01a7f15e"></script>
+<script type="module" src="js/app.js?v=beff4747"></script>
 </body>
 </html>
