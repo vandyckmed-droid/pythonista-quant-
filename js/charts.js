@@ -15,23 +15,29 @@ function setupCanvas(canvas) {
   return { ctx, w: rect.width, h: rect.height };
 }
 
-// 21 thin bars of cumulative return since the close just before the window,
-// anchored to a 0% baseline (up green, down red), on a shared percentage
-// scale passed in by the caller so every card in the list is comparable.
-// A bar beyond scaleMax is capped at the edge with a small chevron, rather
-// than silently drawn as if it were the true height.
-export function drawReturnBars(canvas, pctReturns, scaleMax) {
+// Thin bars anchored to a 0 baseline (positive green, negative red), on a
+// shared scale passed in by the caller so every card in the list is directly
+// comparable. A bar beyond scaleMax is capped at the edge with a small
+// chevron, rather than silently drawn as if it were the true height.
+// Null entries (not enough history for that point) are skipped.
+// `signed` centres the zero line so negative bars have room. When nothing in
+// the whole list is ever negative — as with momentum scores, which are
+// positive by construction for members — zero sits at the bottom instead, so
+// the full height is spent on the range that actually varies.
+export function drawBarSeries(canvas, values, scaleMax, { signed = true } = {}) {
   const { ctx, w, h } = setupCanvas(canvas);
-  const n = pctReturns.length;
-  const zero = h / 2;
+  const n = values.length;
+  const zero = signed ? h / 2 : h;
+  const span = signed ? h / 2 : h;
   const slot = w / n;
-  const barW = Math.max(1, slot * 0.6);
+  const barW = Math.max(1, slot * 0.62);
 
   ctx.clearRect(0, 0, w, h);
-  pctReturns.forEach((v, i) => {
+  values.forEach((v, i) => {
+    if (v == null) return;
     const clipped = Math.abs(v) > scaleMax;
     const clamped = Math.max(-scaleMax, Math.min(scaleMax, v));
-    const barH = (Math.abs(clamped) / scaleMax) * zero;
+    const barH = (Math.abs(clamped) / scaleMax) * span;
     const x = i * slot + (slot - barW) / 2;
     const color = clamped >= 0 ? col('--up') : col('--down');
     ctx.fillStyle = color;
@@ -51,14 +57,6 @@ export function drawReturnBars(canvas, pctReturns, scaleMax) {
       ctx.stroke();
     }
   });
-}
-
-// Given a run of raw closes ending today, the 21 daily cumulative-return
-// values since the close just before that 21-trading-day window.
-export function returns21D(closes) {
-  const win = closes.slice(-22);
-  const base = win[0];
-  return win.slice(1).map(c => c / base - 1);
 }
 
 // Price chart with y gridlines, area wash, end-dot; returns a geometry object

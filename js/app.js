@@ -1,4 +1,4 @@
-import { drawReturnBars, returns21D, drawPriceChart, corrColor, CORR_BUCKETS } from './charts.js';
+import { drawBarSeries, drawPriceChart, corrColor, CORR_BUCKETS } from './charts.js';
 import * as risk from './risk.js';
 
 const $ = s => document.querySelector(s);
@@ -107,28 +107,29 @@ function redundancyTag(sym) {
 }
 
 function rowHTML(m, showVol = false) {
-  const dir = m.chg1d >= 0 ? 'up' : 'down';
   const starred = state.watchlist.has(m.symbol);
   const gain = state.sort === 'diversify' && state.gainUnit === 'bets'
       && state.gain?.has(m.symbol)
     ? `<div class="gain">+${state.gain.get(m.symbol).toFixed(2)} bets</div>`
     : '';
+  const series = m.scoreSeries || [];
+  const latest = [...series].reverse().find(v => v != null);
+  const dir = latest == null ? '' : latest >= 0 ? 'up' : 'down';
   return `
     <div class="row" data-sym="${m.symbol}">
       <div class="rank">${m.rank}</div>
       <div class="id">
         <div class="sym">${familyDot(m.symbol)}${m.symbol}</div>
         <div class="name">${m.name}</div>
-        ${gain || redundancyTag(m.symbol)}
+        ${gain || redundancyTag(m.symbol)
+          || (showVol ? `<div class="volline">vol ${fmt.pct1(m.vol)}</div>` : '')}
       </div>
       <div class="spark-wrap">
-        <div class="spark-label">21D</div>
+        <div class="spark-head">
+          <span class="spark-label">200–20D</span>
+          <span class="spark-now ${dir}">${latest == null ? '—' : latest.toFixed(2)}</span>
+        </div>
         <canvas class="spark"></canvas>
-      </div>
-      <div class="px">
-        <div class="price">${fmt.price(m.price)}</div>
-        <div class="chg ${dir}">${fmt.pct(m.chg1d)}</div>
-        ${showVol ? `<div class="volline">vol ${fmt.pct1(m.vol)}</div>` : ''}
       </div>
       <button class="star ${starred ? 'on' : ''}" data-star="${m.symbol}">${starred ? '★' : '☆'}</button>
     </div>`;
@@ -138,7 +139,9 @@ function drawRowSparklines(container) {
   requestAnimationFrame(() => {
     container.querySelectorAll('.row').forEach(rowEl => {
       const m = state.bySym.get(rowEl.dataset.sym);
-      drawReturnBars(rowEl.querySelector('canvas.spark'), returns21D(m.spark), state.spark21Scale);
+      drawBarSeries(rowEl.querySelector('canvas.spark'),
+                    m.scoreSeries || [], state.scoreScale,
+                    { signed: state.scoreSigned });
     });
   });
 }
@@ -347,6 +350,10 @@ function renderFamilyCoverage(syms) {
   const covered = held.size;
   el.insertAdjacentHTML('afterbegin',
     `<div class="fam-head">${covered} of ${R.clusterNames.length} families</div>`);
+  const sub = $('#families-sub');
+  if (sub) sub.textContent =
+    `The ${state.members.length} names group into ${R.clusterNames.length} ` +
+    `behaviour families. Spreading across them is what lowers risk.`;
 }
 
 // add the single name that most improves effective bets — one tap, reversible
@@ -590,19 +597,21 @@ function wireEvents() {
   });
 }
 
-// One fixed percentage axis for every 21D bar chart in the app, so bar
-// heights are directly comparable card to card. A pure max would let a
-// single extreme mover flatten every other card, and offers no protection
-// if a future one is far more extreme still — so the scale is set from the
-// 90th percentile of each member's own widest move, rounded up to a clean 5%
-// step. The rare name beyond that draws clipped, with a small chevron marking
-// it as capped rather than silently understating it.
-function spark21Scale(members) {
-  const maxAbsPerMember = members.map(
-    m => Math.max(...returns21D(m.spark).map(Math.abs)));
+// One fixed axis for every rolling-score chart in the app, so bar heights are
+// directly comparable card to card. A pure max would let a single extreme
+// name flatten every other card, and offers no protection if a future one is
+// more extreme still — so the scale is the 90th percentile of each member's
+// own widest score, rounded up to a clean step. The rare name beyond that
+// draws clipped, with a chevron marking it as capped rather than understated.
+function scoreScale(members) {
+  const maxAbsPerMember = members
+    .map(m => (m.scoreSeries || []).filter(v => v != null).map(Math.abs))
+    .filter(a => a.length)
+    .map(a => Math.max(...a));
+  if (!maxAbsPerMember.length) return 1;
   maxAbsPerMember.sort((a, b) => a - b);
   const p90 = maxAbsPerMember[Math.floor(maxAbsPerMember.length * 0.9)] ?? 0;
-  return Math.max(0.05, Math.ceil(p90 * 20) / 20);
+  return Math.max(0.5, Math.ceil(p90 * 2) / 2);
 }
 
 /* ---------------- boot ---------------- */
@@ -617,7 +626,9 @@ async function boot() {
   state.meta = meta;
   state.members = screen.members;
   state.members.forEach(m => state.bySym.set(m.symbol, m));
-  state.spark21Scale = spark21Scale(state.members);
+  state.scoreScale = scoreScale(state.members);
+  state.scoreSigned = state.members.some(
+    m => (m.scoreSeries || []).some(v => v != null && v < 0));
   if (riskData) {
     riskData.index = new Map(riskData.symbols.map((s, i) => [s, i]));
     state.risk = riskData;
