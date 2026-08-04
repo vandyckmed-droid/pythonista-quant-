@@ -24,42 +24,39 @@ function setupCanvas(canvas) {
 // the whole list is ever negative — as with momentum scores, which are
 // positive by construction for members — zero sits at the bottom instead, so
 // the full height is spent on the range that actually varies.
-// A 21-day price sparkline with a dashed baseline at the window's opening
-// price, so the line's position against that line reads as gain or loss at a
-// glance. Colour comes from where it finishes relative to the start, not from
-// the day-to-day wiggle.
-export function drawSparkline(canvas, closes) {
+// Cumulative return over the window, starting at exactly zero, drawn against
+// a shared vertical scale so every card is directly comparable: the zero line
+// sits at the same height on every card and a given height always means the
+// same percentage. `returns` are decimals (0 = flat), `scaleMax` the symmetric
+// half-range in the same units.
+export function drawSparkline(canvas, returns, scaleMax) {
   const { ctx, w, h } = setupCanvas(canvas);
-  if (!closes || closes.length < 2) { ctx.clearRect(0, 0, w, h); return; }
-  const base = closes[0];
-  const up = closes[closes.length - 1] >= base;
-  const color = col(up ? '--up' : '--down');
-
-  // keep the baseline inside the frame even when price never revisits it
-  const lo = Math.min(base, ...closes);
-  const hi = Math.max(base, ...closes);
-  const pad = 4;
-  const span = (hi - lo) || Math.abs(base) * 0.01 || 1;
-  const x = i => (i / (closes.length - 1)) * w;
-  const y = v => h - pad - ((v - lo) / span) * (h - pad * 2);
-
   ctx.clearRect(0, 0, w, h);
+  if (!returns || returns.length < 2 || !scaleMax) return;
 
-  // opening price — the zero line the move is measured from
+  const end = returns[returns.length - 1];
+  const color = col(end >= 0 ? '--up' : '--down');
+  const pad = 3;                       // keeps the stroke off the frame edge
+  const zero = h / 2;                  // identical on every card
+  const half = h / 2 - pad;
+  const x = i => (i / (returns.length - 1)) * (w - 2) + 1;
+  const y = v => zero - (Math.max(-scaleMax, Math.min(scaleMax, v)) / scaleMax) * half;
+
+  // the zero line the move is measured from — present, but read second
   ctx.save();
-  ctx.setLineDash([3, 4]);
-  ctx.strokeStyle = '#4a4a4a';
+  ctx.setLineDash([2, 4]);
+  ctx.strokeStyle = '#33373b';
   ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(0, y(base));
-  ctx.lineTo(w, y(base));
+  ctx.moveTo(0, zero);
+  ctx.lineTo(w, zero);
   ctx.stroke();
   ctx.restore();
 
   ctx.beginPath();
-  closes.forEach((v, i) => i ? ctx.lineTo(x(i), y(v)) : ctx.moveTo(x(i), y(v)));
+  returns.forEach((v, i) => i ? ctx.lineTo(x(i), y(v)) : ctx.moveTo(x(i), y(v)));
   ctx.strokeStyle = color;
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 1.6;
   ctx.lineJoin = ctx.lineCap = 'round';
   ctx.stroke();
 }
