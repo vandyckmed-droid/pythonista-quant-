@@ -597,11 +597,13 @@ function wireEvents() {
 }
 
 // One fixed axis for every rolling-score chart in the app, so bar heights are
-// directly comparable card to card. A pure max would let a single extreme
-// name flatten every other card, and offers no protection if a future one is
-// more extreme still — so the scale is the 90th percentile of each member's
-// own widest score, rounded up to a clean step. The rare name beyond that
-// draws clipped, with a chevron marking it as capped rather than understated.
+// directly comparable card to card. A pure max would offer no protection if a
+// future name were far more extreme, so this is a high percentile of each
+// member's own widest score, rounded up to a clean step; anything beyond
+// draws clipped with a chevron rather than understated. The percentile is
+// deliberately high: at p90 the six top-ranked names all clipped, and those
+// are the first rows on screen, so their shape — the whole point of the
+// chart — was the part being cut off.
 function scoreScale(members) {
   const maxAbsPerMember = members
     .map(m => (m.scoreSeries || []).filter(v => v != null).map(Math.abs))
@@ -609,8 +611,9 @@ function scoreScale(members) {
     .map(a => Math.max(...a));
   if (!maxAbsPerMember.length) return 1;
   maxAbsPerMember.sort((a, b) => a - b);
-  const p90 = maxAbsPerMember[Math.floor(maxAbsPerMember.length * 0.9)] ?? 0;
-  return Math.max(0.5, Math.ceil(p90 * 2) / 2);
+  const i = Math.min(maxAbsPerMember.length - 1,
+                     Math.floor(maxAbsPerMember.length * 0.98));
+  return Math.max(0.5, Math.ceil(maxAbsPerMember[i] * 2) / 2);
 }
 
 /* ---------------- boot ---------------- */
