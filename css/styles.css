@@ -11,9 +11,9 @@
   --grid:        #232323;
   --border:      rgba(255, 255, 255, 0.06);
   /* acid green / hot red — the only saturated colour on the card */
-  --up:          #57d02e;
-  --down:        #ff3b30;
-  --accent:      #57d02e;
+  --up:          #4fe22e;
+  --down:        #ff4d4d;
+  --accent:      #4fe22e;
   --blue:        #3987e5;
   --radius:      16px;
 }
@@ -71,58 +71,64 @@ body {
 .ranges .chip { flex: 1; text-align: center; padding: 7px 0; }
 
 /* ---------- list rows ---------- */
-.list { padding: 8px 12px; display: flex; flex-direction: column; gap: 8px; }
+.list {
+  /* generous side inset, and headroom so the first card clears the chips
+     instead of tucking under the header */
+  padding: 16px 18px 10px;
+  display: flex; flex-direction: column; gap: 10px;
+}
 .row {
   display: grid;
-  grid-template-columns: auto auto minmax(58px, 1fr) auto;
-  align-items: center; gap: 12px;
-  background: linear-gradient(180deg, #131313 0%, #0d0d0d 100%);
-  border: 1px solid var(--border);
-  border-radius: 22px;
-  padding: 16px 15px;
+  /* fixed columns: ticker or price length must never move the chart */
+  grid-template-columns: 46px 54px minmax(0, 1fr) 80px;
+  align-items: center; gap: 14px;
+  background: linear-gradient(180deg, #15181b 0%, #0f1113 100%);
+  border: 1px solid #24282c;
+  border-radius: 18px;
+  padding: 15px 15px;
   cursor: pointer;
   -webkit-touch-callout: none; user-select: none; -webkit-user-select: none;
   transition: transform 0.12s ease, background 0.12s ease;
 }
 /* held down, before the ticker view opens */
-.row.pressing { transform: scale(0.975); background: var(--surface-2); }
-.row.selected { border-color: rgba(87, 208, 46, 0.45); }
+.row.pressing { transform: scale(0.985); background: #1b1f23; }
+.row.selected { border-color: rgba(79, 226, 46, 0.42); }
 /* every watchlist row is selected by definition, so the cue is noise there */
-#watchlist-list .row.selected { border-color: var(--border); }
+#watchlist-list .row.selected { border-color: #24282c; }
 
-/* the screen's headline fact, so it carries the most weight on the card */
+/* the primary anchor: clearly largest, but not the heaviest */
 .rank {
-  font-size: 30px; font-weight: 600; letter-spacing: -0.03em;
+  font-size: 31px; font-weight: 400; letter-spacing: -0.02em;
   color: var(--ink); font-variant-numeric: tabular-nums;
-  line-height: 1; min-width: 30px; text-align: center;
+  line-height: 1; text-align: left;
 }
 .row .tick { min-width: 0; }
 .row .sym {
-  font-size: 19px; font-weight: 500; letter-spacing: 0.01em;
+  font-size: 17px; font-weight: 400; letter-spacing: 0.015em;
   color: var(--ink); line-height: 1.2;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
 .row .chart { min-width: 0; }
 .chart-cap {
-  display: flex; justify-content: center; align-items: baseline; gap: 7px;
-  margin-top: 3px; font-size: 11px; font-weight: 600;
-  font-variant-numeric: tabular-nums;
+  display: flex; justify-content: center; align-items: baseline; gap: 6px;
+  margin-top: 4px; font-size: 9.5px; font-weight: 500;
+  font-variant-numeric: tabular-nums; letter-spacing: 0.01em;
 }
-.cap-win { color: var(--muted); }
+.cap-win { color: #7e848a; }
 .cap-chg.up   { color: var(--up); }
 .cap-chg.down { color: var(--down); }
 
 .row .px { text-align: right; }
 .row .price {
-  font-size: 19px; font-weight: 600; color: var(--ink);
-  letter-spacing: -0.01em; font-variant-numeric: tabular-nums; line-height: 1.15;
+  font-size: 17px; font-weight: 400; color: var(--ink);
+  letter-spacing: 0; font-variant-numeric: tabular-nums; line-height: 1.2;
 }
 .px-label {
-  font-size: 9px; font-weight: 700; color: var(--muted);
-  letter-spacing: 0.09em; text-transform: uppercase; margin-top: 2px;
+  font-size: 8.5px; font-weight: 400; color: #7e848a;
+  letter-spacing: 0.055em; text-transform: uppercase; margin-top: 3px;
 }
-.row canvas.spark { width: 100%; height: 42px; display: block; }
+.row canvas.spark { width: 100%; height: 34px; display: block; }
 
 /* A drawn star rather than a glyph. In the list it is only an indicator -
    the row itself is the tap target - so it stays very quiet until selected. */
@@ -137,7 +143,7 @@ body {
 button.star { pointer-events: auto; }
 .star.on {
   background-color: var(--accent);
-  filter: drop-shadow(0 0 5px rgba(87, 208, 46, 0.5));
+  filter: drop-shadow(0 0 5px rgba(79, 226, 46, 0.5));
 }
 .star.big {
   width: 40px; height: 40px;
