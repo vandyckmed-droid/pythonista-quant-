@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The wide Screen: rank ~1500 largest US equities by return/volatility over
+"""The wide Screen: rank the largest US equities by return/volatility over
 the 200 -> 20 trading-days-ago window and rebuild membership with hysteresis
 (enter at rank <= 150, stay until rank > 195).
 

@@ -12,8 +12,10 @@ Data source: Financial Modeling Prep (FMP), end-of-day prices.
    worth at least $1 billion on the NYSE, NASDAQ, or AMEX (~2,100 tickers).
 2. **Throw out the junk.** Remove funds, trusts, blank-check shells, and oddball
    tickers. When one company has two ticker symbols (GOOG/GOOGL), keep only the
-   bigger one so no company appears twice.
-3. **Cut to the 1,500 largest** by company value. That's the universe being judged.
+   bigger one so no company appears twice. Also drop anything under **$5 a share**
+   or trading under **$1M a day** — deliberately loose floors that only catch
+   names that are obviously untradeable.
+3. **Cut to the 1,000 largest** by company value. That's the universe being judged.
    Names with under **2 years of price history** are then dropped before ranking —
    a stock we can't measure correlations for is one we'd be holding blind, so it
    never enters the list. (This does exclude recent IPOs and spin-offs, which
@@ -23,6 +25,8 @@ Data source: Financial Modeling Prep (FMP), end-of-day prices.
    Two numbers come out: how much it gained, and how bumpy the ride was. The score
    is **gain ÷ bumpiness** — a smooth 60% beats a violent 80%. The most recent
    month is deliberately ignored because recent-month moves tend to reverse.
+   Anything averaging under **$3M of trading a day** over the last 20 days is
+   dropped here (a real average, unlike the rough one-day check in step 2).
 5. **Rank everyone** by that score, best first. (Stocks without enough price
    history to judge fairly — very recent IPOs — are dropped here.)
 6. **Apply the "sticky door" rule.** The top 150 get in, but an existing member
