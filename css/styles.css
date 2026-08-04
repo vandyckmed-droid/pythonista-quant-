@@ -76,6 +76,9 @@ body {
      instead of tucking under the header */
   padding: 16px 18px 10px;
   display: flex; flex-direction: column; gap: 10px;
+  /* Rows never change height, so the browser has nothing useful to correct
+     for — and its guess after a tag rewrite is what nudges the page. */
+  overflow-anchor: none;
 }
 .row {
   display: grid;

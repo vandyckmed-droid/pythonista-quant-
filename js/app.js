@@ -128,13 +128,19 @@ function rowTag(m, showVol) {
 // Selection changes what the tags say, but must not re-sort or rebuild the
 // list: doing either yanks the content out from under the finger that just
 // tapped it — worst in the Diversifies sort, where every gain shifts.
+// Rewriting a slot destroys and rebuilds its nodes, and Safari re-picks its
+// scroll anchor when that happens — 100 rewrites per tap is enough churn to
+// nudge the page by a pixel or two. Almost every tap changes at most one or
+// two tags, so write only where the markup actually differs.
 function refreshRowStates(container, showVol = false) {
   container.querySelectorAll('.row').forEach(row => {
     const m = state.bySym.get(row.dataset.sym);
     if (!m) return;
     row.classList.toggle('selected', state.watchlist.has(m.symbol));
     const slot = row.querySelector('.tag-slot');
-    if (slot) slot.innerHTML = rowTag(m, showVol);
+    if (!slot) return;
+    const html = rowTag(m, showVol);
+    if (slot.innerHTML !== html) slot.innerHTML = html;
   });
 }
 
@@ -595,8 +601,11 @@ function wireRowGestures(container) {
     if (Math.abs(x - x0) > MOVE_CANCEL_PX || Math.abs(y - y0) > MOVE_CANCEL_PX) clear();
   };
 
-  const end = () => {
+  const end = e => {
     if (!row) return;
+    // Swallow the synthetic click iOS fires ~300ms after touchend: it lands on
+    // a row that has just changed state, and Safari can scroll to reveal it.
+    e?.cancelable && e.preventDefault();
     const sym = row.dataset.sym;
     const fired = longFired;
     clear();
@@ -607,7 +616,7 @@ function wireRowGestures(container) {
     e => start(e.target, e.touches[0].clientX, e.touches[0].clientY), { passive: true });
   container.addEventListener('touchmove',
     e => move(e.touches[0].clientX, e.touches[0].clientY), { passive: true });
-  container.addEventListener('touchend', end);
+  container.addEventListener('touchend', e => end(e));
   container.addEventListener('touchcancel', clear);
 
   // pointer fallback for desktop; ignored when touch already handled it
