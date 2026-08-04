@@ -47,25 +47,14 @@ export function drawSparkline(canvas, closes) {
 
   // opening price — the zero line the move is measured from
   ctx.save();
-  ctx.setLineDash([2, 3]);
-  ctx.strokeStyle = col('--grid');
+  ctx.setLineDash([3, 4]);
+  ctx.strokeStyle = '#4a4a4a';
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(0, y(base));
   ctx.lineTo(w, y(base));
   ctx.stroke();
   ctx.restore();
-
-  // faint wash between the line and its baseline, for body
-  ctx.beginPath();
-  closes.forEach((v, i) => i ? ctx.lineTo(x(i), y(v)) : ctx.moveTo(x(i), y(v)));
-  ctx.lineTo(x(closes.length - 1), y(base));
-  ctx.lineTo(x(0), y(base));
-  ctx.closePath();
-  ctx.globalAlpha = 0.13;
-  ctx.fillStyle = color;
-  ctx.fill();
-  ctx.globalAlpha = 1;
 
   ctx.beginPath();
   closes.forEach((v, i) => i ? ctx.lineTo(x(i), y(v)) : ctx.moveTo(x(i), y(v)));

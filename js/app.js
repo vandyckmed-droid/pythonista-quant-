@@ -122,22 +122,24 @@ function rowHTML(m, showVol = false) {
   const dir = chg == null ? '' : chg >= 0 ? 'up' : 'down';
   return `
     <div class="row ${starred ? 'selected' : ''}" data-sym="${m.symbol}">
-      <div class="id">
-        <div class="sym-line">
-          <span class="rank">${m.rank}</span>
-          ${familyDot(m.symbol)}<span class="sym">${m.symbol}</span>
-        </div>
-        <div class="name">${m.name}</div>
+      <div class="rank">${m.rank}</div>
+      <div class="tick">
+        ${familyDot(m.symbol)}<span class="sym">${m.symbol}</span>
         ${gain || redundancyTag(m.symbol)
           || (showVol ? `<div class="volline">vol ${fmt.pct1(m.vol)}</div>` : '')}
       </div>
-      <canvas class="spark"></canvas>
-      <div class="chg-col">
-        <div class="chg21 ${dir}">${chg == null ? '—'
-          : `${chg >= 0 ? '+' : ''}${(chg * 100).toFixed(1)}%`}</div>
-        <div class="chg21-label">21D</div>
+      <div class="chart">
+        <canvas class="spark"></canvas>
+        <div class="chart-cap">
+          <span class="cap-win">21D</span>
+          <span class="cap-chg ${dir}">${chg == null ? '—'
+            : `${chg >= 0 ? '+' : ''}${(chg * 100).toFixed(1)}%`}</span>
+        </div>
       </div>
-      <span class="star ${starred ? 'on' : ''}" aria-hidden="true"></span>
+      <div class="px">
+        <div class="price">$${fmt.price(m.price)}</div>
+        <div class="px-label">Last close</div>
+      </div>
     </div>`;
 }
 

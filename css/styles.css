@@ -11,9 +11,9 @@
   --grid:        #232323;
   --border:      rgba(255, 255, 255, 0.06);
   /* acid green / hot red — the only saturated colour on the card */
-  --up:          #35ff5a;
+  --up:          #57d02e;
   --down:        #ff3b30;
-  --accent:      #35ff5a;
+  --accent:      #57d02e;
   --blue:        #3987e5;
   --radius:      16px;
 }
@@ -74,50 +74,55 @@ body {
 .list { padding: 8px 12px; display: flex; flex-direction: column; gap: 8px; }
 .row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 76px 66px 22px;
-  align-items: center; gap: 9px;
-  background: var(--surface);
+  grid-template-columns: auto auto minmax(58px, 1fr) auto;
+  align-items: center; gap: 12px;
+  background: linear-gradient(180deg, #131313 0%, #0d0d0d 100%);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 14px 12px 14px 16px;
+  border-radius: 22px;
+  padding: 16px 15px;
   cursor: pointer;
   -webkit-touch-callout: none; user-select: none; -webkit-user-select: none;
   transition: transform 0.12s ease, background 0.12s ease;
 }
 /* held down, before the ticker view opens */
 .row.pressing { transform: scale(0.975); background: var(--surface-2); }
-.row.selected { border-color: rgba(53, 255, 90, 0.32); }
+.row.selected { border-color: rgba(87, 208, 46, 0.45); }
+/* every watchlist row is selected by definition, so the cue is noise there */
+#watchlist-list .row.selected { border-color: var(--border); }
 
-.row .id { min-width: 0; }
-.sym-line { display: flex; align-items: baseline; gap: 7px; min-width: 0; }
-/* rank reads level with the ticker - it is the screen's headline fact */
+/* the screen's headline fact, so it carries the most weight on the card */
 .rank {
-  font-size: 21px; font-weight: 800; letter-spacing: -0.02em;
-  color: var(--ink-2); font-variant-numeric: tabular-nums;
-  line-height: 1.15; flex: 0 0 auto;
+  font-size: 30px; font-weight: 600; letter-spacing: -0.03em;
+  color: var(--ink); font-variant-numeric: tabular-nums;
+  line-height: 1; min-width: 30px; text-align: center;
 }
+.row .tick { min-width: 0; }
 .row .sym {
-  font-size: 21px; font-weight: 800; letter-spacing: -0.01em;
-  color: var(--ink); line-height: 1.15;
+  font-size: 19px; font-weight: 500; letter-spacing: 0.01em;
+  color: var(--ink); line-height: 1.2;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.row .name {
-  font-size: 12.5px; color: var(--muted); margin-top: 1px;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.row canvas.spark { width: 76px; height: 38px; display: block; }
 
-.chg-col { text-align: right; }
-.chg21 {
-  font-size: 17px; font-weight: 800; font-variant-numeric: tabular-nums;
-  letter-spacing: -0.02em; line-height: 1.1;
+.row .chart { min-width: 0; }
+.chart-cap {
+  display: flex; justify-content: center; align-items: baseline; gap: 7px;
+  margin-top: 3px; font-size: 11px; font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
-.chg21.up   { color: var(--up); }
-.chg21.down { color: var(--down); }
-.chg21-label {
-  font-size: 9.5px; font-weight: 700; color: var(--muted);
-  letter-spacing: 0.06em; margin-top: 1px;
+.cap-win { color: var(--muted); }
+.cap-chg.up   { color: var(--up); }
+.cap-chg.down { color: var(--down); }
+
+.row .px { text-align: right; }
+.row .price {
+  font-size: 19px; font-weight: 600; color: var(--ink);
+  letter-spacing: -0.01em; font-variant-numeric: tabular-nums; line-height: 1.15;
 }
+.px-label {
+  font-size: 9px; font-weight: 700; color: var(--muted);
+  letter-spacing: 0.09em; text-transform: uppercase; margin-top: 2px;
+}
+.row canvas.spark { width: 100%; height: 42px; display: block; }
 
 /* A drawn star rather than a glyph. In the list it is only an indicator -
    the row itself is the tap target - so it stays very quiet until selected. */
@@ -132,7 +137,7 @@ body {
 button.star { pointer-events: auto; }
 .star.on {
   background-color: var(--accent);
-  filter: drop-shadow(0 0 5px rgba(53, 255, 90, 0.5));
+  filter: drop-shadow(0 0 5px rgba(87, 208, 46, 0.5));
 }
 .star.big {
   width: 40px; height: 40px;
