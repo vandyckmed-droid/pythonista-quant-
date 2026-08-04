@@ -92,9 +92,18 @@ body {
 }
 /* held down, before the ticker view opens */
 .row.pressing { transform: scale(0.985); background: #1b1f23; }
-.row.selected { border-color: rgba(79, 226, 46, 0.42); }
+/* Selection reads instantly: a crisp 2px acid ring (1px border + 1px inset
+   shadow, so the card never changes size), a faint green wash inside, and a
+   soft halo outside. Deliberately short of neon — the ring does the work. */
+.row.selected {
+  border-color: rgba(79, 226, 46, 0.85);
+  box-shadow:
+    inset 0 0 0 1px rgba(79, 226, 46, 0.85),
+    inset 0 0 24px rgba(79, 226, 46, 0.055),
+    0 0 12px rgba(79, 226, 46, 0.16);
+}
 /* every watchlist row is selected by definition, so the cue is noise there */
-#watchlist-list .row.selected { border-color: #24282c; }
+#watchlist-list .row.selected { border-color: #24282c; box-shadow: none; }
 
 /* the primary anchor: clearly largest, but not the heaviest */
 .rank {
