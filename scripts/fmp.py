@@ -26,6 +26,7 @@ HISTORY_YEARS = 5
 MIN_HISTORY_DAYS = 504   # ~2 years; a name with less can't be risk-analyzed,
                          # so it never enters the universe at all
 N_CLUSTERS = 8           # behaviour families shown in the app
+SCORE_SERIES_POINTS = 48  # trading days of rolling momentum score shown per card
 BENCHMARK = "VTI"        # total US market — matches a universe that runs down
                          # to $1B, unlike large-cap-only SPY
 
@@ -157,11 +158,31 @@ def momentum(closes):
     return ret / vol, ret, vol
 
 
+def momentum_series(closes, points=SCORE_SERIES_POINTS):
+    """The momentum score recomputed for each of the last `points` days,
+    oldest first - i.e. the same WINDOW_FAR -> WINDOW_NEAR score the ranking
+    uses, rolled backwards a day at a time, so the shape shows whether a
+    name's volatility-adjusted return is building or fading.
+
+    Each point needs WINDOW_FAR days of history behind it, so this can only be
+    computed where the full stored history is available, never from `spark`.
+    """
+    out = []
+    for k in range(points - 1, -1, -1):
+        end = len(closes) - k
+        if end - WINDOW_FAR < 0:
+            continue
+        mom = momentum(closes[:end])
+        out.append(None if mom is None else round(mom[0], 3))
+    return out
+
+
 def member_summary(m, dates, closes):
     """Fields the UI reads that refresh on every update."""
     m["price"] = round(closes[-1], 2)
     m["chg1d"] = round(closes[-1] / closes[-2] - 1, 4) if len(closes) > 1 else 0.0
     m["spark"] = [round(c, 2) for c in closes[-30:]]
+    m["scoreSeries"] = momentum_series(closes)
     return m
 
 
