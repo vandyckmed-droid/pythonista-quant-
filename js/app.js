@@ -61,8 +61,7 @@ function renderFreshness() {
 function sortedMembers() {
   const ms = [...state.members];
   const k = state.sort;
-  if (k === 'chg1d') ms.sort((a, b) => b.chg1d - a.chg1d);
-  else if (k === 'ret') ms.sort((a, b) => b.ret - a.ret);
+  if (k === 'ret') ms.sort((a, b) => b.ret - a.ret);
   else if (k === 'vol') ms.sort((a, b) => a.vol - b.vol);
   else if (k === 'diversify') {
     const g = state.gain;
