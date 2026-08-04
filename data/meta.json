@@ -1,13 +1,13 @@
 {
-  "lastScreen": "2026-08-03T20:46:27Z",
-  "lastUpdate": "2026-08-03T20:46:27Z",
+  "lastScreen": "2026-08-04T00:27:22Z",
+  "lastUpdate": "2026-08-04T00:27:22Z",
   "pricesThrough": "2026-08-03",
   "window": {
     "far": 200,
     "near": 20
   },
-  "universeScanned": 1500,
-  "members": 160,
+  "universeScanned": 1000,
+  "members": 150,
   "minHistoryDays": 504,
   "priceFloor": 5.0,
   "minAvgDollarVolume": 3000000.0,
