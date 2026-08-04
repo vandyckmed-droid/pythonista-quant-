@@ -1,4 +1,4 @@
-import { drawBarSeries, drawPriceChart, corrColor, CORR_BUCKETS } from './charts.js';
+import { drawSparkline, drawPriceChart, corrColor, CORR_BUCKETS } from './charts.js';
 import * as risk from './risk.js';
 
 const $ = s => document.querySelector(s);
@@ -105,15 +105,21 @@ function redundancyTag(sym) {
   return `<div class="dupe">≈ ${near.symbol} ${near.corr.toFixed(2)}</div>`;
 }
 
+// the 21-day window the card's sparkline and headline change both describe
+function window21(m) {
+  const win = (m.spark || []).slice(-22);
+  if (win.length < 2) return { closes: [], chg: null };
+  return { closes: win, chg: win[win.length - 1] / win[0] - 1 };
+}
+
 function rowHTML(m, showVol = false) {
   const starred = state.watchlist.has(m.symbol);
   const gain = state.sort === 'diversify' && state.gainUnit === 'bets'
       && state.gain?.has(m.symbol)
     ? `<div class="gain">+${state.gain.get(m.symbol).toFixed(2)} bets</div>`
     : '';
-  const series = m.scoreSeries || [];
-  const latest = [...series].reverse().find(v => v != null);
-  const dir = latest == null ? '' : latest >= 0 ? 'up' : 'down';
+  const { chg } = window21(m);
+  const dir = chg == null ? '' : chg >= 0 ? 'up' : 'down';
   return `
     <div class="row" data-sym="${m.symbol}">
       <div class="rank">${m.rank}</div>
@@ -123,14 +129,14 @@ function rowHTML(m, showVol = false) {
         ${gain || redundancyTag(m.symbol)
           || (showVol ? `<div class="volline">vol ${fmt.pct1(m.vol)}</div>` : '')}
       </div>
-      <div class="spark-wrap">
-        <div class="spark-head">
-          <span class="spark-label">200–20D</span>
-          <span class="spark-now ${dir}">${latest == null ? '—' : latest.toFixed(2)}</span>
-        </div>
-        <canvas class="spark"></canvas>
+      <canvas class="spark"></canvas>
+      <div class="chg-col">
+        <div class="chg21 ${dir}">${chg == null ? '—'
+          : `${chg >= 0 ? '+' : ''}${(chg * 100).toFixed(1)}%`}</div>
+        <div class="chg21-label">21D</div>
       </div>
-      <button class="star ${starred ? 'on' : ''}" data-star="${m.symbol}">${starred ? '★' : '☆'}</button>
+      <button class="star ${starred ? 'on' : ''}" data-star="${m.symbol}"
+              aria-label="${starred ? 'Remove from' : 'Add to'} watchlist"></button>
     </div>`;
 }
 
@@ -138,9 +144,7 @@ function drawRowSparklines(container) {
   requestAnimationFrame(() => {
     container.querySelectorAll('.row').forEach(rowEl => {
       const m = state.bySym.get(rowEl.dataset.sym);
-      drawBarSeries(rowEl.querySelector('canvas.spark'),
-                    m.scoreSeries || [], state.scoreScale,
-                    { signed: state.scoreSigned });
+      drawSparkline(rowEl.querySelector('canvas.spark'), window21(m).closes);
     });
   });
 }
@@ -488,8 +492,8 @@ function renderDetailStats() {
 function updateStarButton() {
   const on = state.watchlist.has(state.detail);
   const b = $('#detail-star');
-  b.textContent = on ? '★' : '☆';
   b.classList.toggle('on', on);
+  b.setAttribute('aria-label', `${on ? 'Remove from' : 'Add to'} watchlist`);
 }
 
 /* ---------------- navigation ---------------- */
@@ -596,26 +600,6 @@ function wireEvents() {
   });
 }
 
-// One fixed axis for every rolling-score chart in the app, so bar heights are
-// directly comparable card to card. A pure max would offer no protection if a
-// future name were far more extreme, so this is a high percentile of each
-// member's own widest score, rounded up to a clean step; anything beyond
-// draws clipped with a chevron rather than understated. The percentile is
-// deliberately high: at p90 the six top-ranked names all clipped, and those
-// are the first rows on screen, so their shape — the whole point of the
-// chart — was the part being cut off.
-function scoreScale(members) {
-  const maxAbsPerMember = members
-    .map(m => (m.scoreSeries || []).filter(v => v != null).map(Math.abs))
-    .filter(a => a.length)
-    .map(a => Math.max(...a));
-  if (!maxAbsPerMember.length) return 1;
-  maxAbsPerMember.sort((a, b) => a - b);
-  const i = Math.min(maxAbsPerMember.length - 1,
-                     Math.floor(maxAbsPerMember.length * 0.98));
-  return Math.max(0.5, Math.ceil(maxAbsPerMember[i] * 2) / 2);
-}
-
 /* ---------------- boot ---------------- */
 
 async function boot() {
@@ -628,9 +612,6 @@ async function boot() {
   state.meta = meta;
   state.members = screen.members;
   state.members.forEach(m => state.bySym.set(m.symbol, m));
-  state.scoreScale = scoreScale(state.members);
-  state.scoreSigned = state.members.some(
-    m => (m.scoreSeries || []).some(v => v != null && v < 0));
   if (riskData) {
     riskData.index = new Map(riskData.symbols.map((s, i) => [s, i]));
     state.risk = riskData;
