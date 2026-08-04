@@ -26,7 +26,11 @@ HISTORY_YEARS = 5
 MIN_HISTORY_DAYS = 504   # ~2 years; a name with less can't be risk-analyzed,
                          # so it never enters the universe at all
 N_CLUSTERS = 8           # behaviour families shown in the app
-SCORE_SERIES_POINTS = 48  # trading days of rolling momentum score shown per card
+SCORE_SERIES_POINTS = 24  # trading days of rolling momentum score shown per card.
+                          # Kept low so each bar can be wide enough to read as a
+                          # bar rather than a barcode stripe; the score moves
+                          # slowly (a 180-day window) so ~5 weeks still shows
+                          # direction clearly.
 BENCHMARK = "VTI"        # total US market — matches a universe that runs down
                          # to $1B, unlike large-cap-only SPY
 

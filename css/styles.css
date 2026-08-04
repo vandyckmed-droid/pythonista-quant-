@@ -12,6 +12,9 @@
   --border:      rgba(255, 255, 255, 0.10);
   --up:          #0ca30c;
   --down:        #e66767;
+  /* history bars: muted so the latest bar reads as the live value */
+  --bar-dim-up:   #4c6b52;
+  --bar-dim-down: #7c5252;
   --accent:      #0ca30c;
   --blue:        #3987e5;
   --radius:      14px;
@@ -90,7 +93,7 @@ body {
 .spark-wrap { width: 148px; }
 .spark-head {
   display: flex; align-items: baseline; justify-content: space-between;
-  gap: 6px; margin-bottom: 3px;
+  gap: 6px; margin-bottom: 1px;
 }
 .spark-label {
   font-size: 8.5px; font-weight: 700; color: var(--muted);
@@ -102,7 +105,7 @@ body {
 }
 .spark-now.up   { color: var(--up); }
 .spark-now.down { color: var(--down); }
-.row canvas.spark { width: 148px; height: 28px; display: block; }
+.row canvas.spark { width: 148px; height: 56px; display: block; }
 
 .star {
   border: 0; background: none; color: var(--muted);
