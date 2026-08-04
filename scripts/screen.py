@@ -110,7 +110,7 @@ def build_universe():
     return uni
 
 
-def main():
+def main(reset=False):
     today = dt.date.today()
     window_start = (today - dt.timedelta(days=320)).isoformat()
     five_years_ago = (today - dt.timedelta(days=int(fmp.HISTORY_YEARS * 365.25))).isoformat()
@@ -183,11 +183,17 @@ def main():
     for i, m in enumerate(eligible):
         m["rank"] = i + 1
 
-    # hysteresis against previous membership (ignore sample data)
+    # hysteresis against previous membership (ignore sample data). --reset
+    # starts clean, so the run lands exactly on KEEP instead of grandfathering
+    # yesterday's members through the KEEP..STAY band - what you want after
+    # changing KEEP, since otherwise the old band silently inflates the count.
     prev_meta = fmp.load_json(fmp.DATA / "meta.json", {}) or {}
     prev = fmp.load_json(fmp.DATA / "screen.json", {}) or {}
     prev_members = set()
-    if not prev_meta.get("fake"):
+    if reset:
+        print("  --reset: ignoring previous membership, no hysteresis this run",
+              file=sys.stderr)
+    elif not prev_meta.get("fake"):
         prev_members = {m["symbol"] for m in prev.get("members", [])}
 
     members = [m for m in eligible
@@ -223,6 +229,8 @@ def main():
         "minHistoryDays": fmp.MIN_HISTORY_DAYS,
         "priceFloor": PRICE_FLOOR,
         "minAvgDollarVolume": PRECISE_DOLLAR_VOL_FLOOR,
+        "keep": fmp.KEEP,
+        "stay": fmp.STAY,
         "fake": False,
     }, compact=False)
     print(f"done: {len(members)} members, prices through {max(last_dates)}")
@@ -231,4 +239,4 @@ def main():
 if __name__ == "__main__":
     if not fmp.API_KEY:
         sys.exit("FMP_API_KEY (or API_KEY) is not set")
-    main()
+    main(reset="--reset" in sys.argv)

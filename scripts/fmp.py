@@ -19,8 +19,8 @@ API_KEY = os.environ.get("FMP_API_KEY") or os.environ.get("API_KEY") or ""
 
 WINDOW_FAR = 200   # trading days ago
 WINDOW_NEAR = 20
-KEEP = 150         # enter at rank <= KEEP
-STAY = 195         # members stay until rank > STAY
+KEEP = 100         # enter at rank <= KEEP
+STAY = 130         # members stay until rank > STAY (a 30% buffer, as at 150/195)
 UNIVERSE_SIZE = 1000
 HISTORY_YEARS = 5
 MIN_HISTORY_DAYS = 504   # ~2 years; a name with less can't be risk-analyzed,
