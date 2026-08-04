@@ -112,12 +112,31 @@ function window21(m) {
   return { closes: win, chg: win[win.length - 1] / win[0] - 1 };
 }
 
+// the one optional line under the ticker; kept in its own slot so selection
+// can refresh it without rebuilding the row
+function rowTag(m, showVol) {
+  if (state.sort === 'diversify' && state.gainUnit === 'bets' && state.gain?.has(m.symbol))
+    return `<div class="gain">+${state.gain.get(m.symbol).toFixed(2)} bets</div>`;
+  const dupe = redundancyTag(m.symbol);
+  if (dupe) return dupe;
+  return showVol ? `<div class="volline">vol ${fmt.pct1(m.vol)}</div>` : '';
+}
+
+// Selection changes what the tags say, but must not re-sort or rebuild the
+// list: doing either yanks the content out from under the finger that just
+// tapped it — worst in the Diversifies sort, where every gain shifts.
+function refreshRowStates(container, showVol = false) {
+  container.querySelectorAll('.row').forEach(row => {
+    const m = state.bySym.get(row.dataset.sym);
+    if (!m) return;
+    row.classList.toggle('selected', state.watchlist.has(m.symbol));
+    const slot = row.querySelector('.tag-slot');
+    if (slot) slot.innerHTML = rowTag(m, showVol);
+  });
+}
+
 function rowHTML(m, showVol = false) {
   const starred = state.watchlist.has(m.symbol);
-  const gain = state.sort === 'diversify' && state.gainUnit === 'bets'
-      && state.gain?.has(m.symbol)
-    ? `<div class="gain">+${state.gain.get(m.symbol).toFixed(2)} bets</div>`
-    : '';
   const { chg } = window21(m);
   const dir = chg == null ? '' : chg >= 0 ? 'up' : 'down';
   return `
@@ -125,8 +144,7 @@ function rowHTML(m, showVol = false) {
       <div class="rank">${m.rank}</div>
       <div class="tick">
         ${familyDot(m.symbol)}<span class="sym">${m.symbol}</span>
-        ${gain || redundancyTag(m.symbol)
-          || (showVol ? `<div class="volline">vol ${fmt.pct1(m.vol)}</div>` : '')}
+        <div class="tag-slot">${rowTag(m, showVol)}</div>
       </div>
       <div class="chart">
         <canvas class="spark"></canvas>
@@ -529,7 +547,10 @@ function toggleStar(sym) {
   else state.watchlist.add(sym);
   saveWatchlist();
   refreshGains();   // redundancy flags and gains are relative to what's held
-  if (state.view === 'screen') renderScreen();
+  // update in place rather than re-rendering: the list must not move under
+  // the finger that just tapped it
+  if (state.view === 'screen') refreshRowStates($('#screen-list'));
+  // the watchlist genuinely gains or loses a row, so it does have to rebuild
   if (state.view === 'watchlist') renderWatchlist();
   if (state.view === 'detail') updateStarButton();
 }
