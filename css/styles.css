@@ -44,6 +44,11 @@ body {
 .topbar h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
 .freshness { font-size: 12px; color: var(--muted); text-align: right; line-height: 1.35; }
 
+.hint {
+  font-size: 11.5px; color: var(--muted);
+  padding: 10px 16px 0; letter-spacing: 0.01em;
+}
+
 /* ---------- chips ---------- */
 .chips {
   display: flex; gap: 8px; padding: 12px 16px 4px;
@@ -69,20 +74,28 @@ body {
 .list { padding: 8px 12px; display: flex; flex-direction: column; gap: 8px; }
 .row {
   display: grid;
-  grid-template-columns: 20px minmax(0, 1fr) 76px 66px 26px;
+  grid-template-columns: minmax(0, 1fr) 76px 66px 22px;
   align-items: center; gap: 9px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 14px 12px 14px 16px;
   cursor: pointer;
+  -webkit-touch-callout: none; user-select: none; -webkit-user-select: none;
+  transition: transform 0.12s ease, background 0.12s ease;
 }
-.row:active { background: var(--surface-2); }
-.rank {
-  font-size: 11.5px; font-weight: 700; color: #5a5a5a;
-  font-variant-numeric: tabular-nums; text-align: right;
-}
+/* held down, before the ticker view opens */
+.row.pressing { transform: scale(0.975); background: var(--surface-2); }
+.row.selected { border-color: rgba(53, 255, 90, 0.32); }
+
 .row .id { min-width: 0; }
+.sym-line { display: flex; align-items: baseline; gap: 7px; min-width: 0; }
+/* rank reads level with the ticker - it is the screen's headline fact */
+.rank {
+  font-size: 21px; font-weight: 800; letter-spacing: -0.02em;
+  color: var(--ink-2); font-variant-numeric: tabular-nums;
+  line-height: 1.15; flex: 0 0 auto;
+}
 .row .sym {
   font-size: 21px; font-weight: 800; letter-spacing: -0.01em;
   color: var(--ink); line-height: 1.15;
@@ -106,16 +119,17 @@ body {
   letter-spacing: 0.06em; margin-top: 1px;
 }
 
-/* A drawn star rather than a glyph: as an outline it stays quiet enough to
-   sit beside the numbers, and fills with the accent only once it's on. */
+/* A drawn star rather than a glyph. In the list it is only an indicator -
+   the row itself is the tap target - so it stays very quiet until selected. */
 .star {
   border: 0; background: none; cursor: pointer;
-  width: 26px; height: 26px; padding: 0;
-  display: flex; align-items: center; justify-content: center;
-  -webkit-mask: var(--star-mask) center / 17px 17px no-repeat;
-  mask: var(--star-mask) center / 17px 17px no-repeat;
-  background-color: #3a3a3a;
+  width: 22px; height: 22px; padding: 0; display: block;
+  -webkit-mask: var(--star-mask) center / 15px 15px no-repeat;
+  mask: var(--star-mask) center / 15px 15px no-repeat;
+  background-color: #2c2c2c;
+  pointer-events: none;   /* taps belong to the row */
 }
+button.star { pointer-events: auto; }
 .star.on {
   background-color: var(--accent);
   filter: drop-shadow(0 0 5px rgba(53, 255, 90, 0.5));
@@ -171,6 +185,12 @@ body {
 .tile .t-value.small { font-size: 16px; }
 
 /* ---------- detail ---------- */
+/* brief nudge when swiping between tickers, so direction registers */
+@keyframes slideFromRight { from { transform: translateX(26px); opacity: 0.4; } }
+@keyframes slideFromLeft  { from { transform: translateX(-26px); opacity: 0.4; } }
+.view.detail.slide-left  { animation: slideFromRight 0.2s ease-out; }
+.view.detail.slide-right { animation: slideFromLeft 0.2s ease-out; }
+
 .detail-head {
   display: flex; justify-content: space-between; align-items: center;
   padding: 10px 12px 0;
