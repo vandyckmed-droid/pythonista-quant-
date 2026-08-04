@@ -121,10 +121,12 @@ function rowHTML(m, showVol = false) {
   const { chg } = window21(m);
   const dir = chg == null ? '' : chg >= 0 ? 'up' : 'down';
   return `
-    <div class="row" data-sym="${m.symbol}">
-      <div class="rank">${m.rank}</div>
+    <div class="row ${starred ? 'selected' : ''}" data-sym="${m.symbol}">
       <div class="id">
-        <div class="sym">${familyDot(m.symbol)}${m.symbol}</div>
+        <div class="sym-line">
+          <span class="rank">${m.rank}</span>
+          ${familyDot(m.symbol)}<span class="sym">${m.symbol}</span>
+        </div>
         <div class="name">${m.name}</div>
         ${gain || redundancyTag(m.symbol)
           || (showVol ? `<div class="volline">vol ${fmt.pct1(m.vol)}</div>` : '')}
@@ -135,8 +137,7 @@ function rowHTML(m, showVol = false) {
           : `${chg >= 0 ? '+' : ''}${(chg * 100).toFixed(1)}%`}</div>
         <div class="chg21-label">21D</div>
       </div>
-      <button class="star ${starred ? 'on' : ''}" data-star="${m.symbol}"
-              aria-label="${starred ? 'Remove from' : 'Add to'} watchlist"></button>
+      <span class="star ${starred ? 'on' : ''}" aria-hidden="true"></span>
     </div>`;
 }
 
@@ -414,10 +415,21 @@ function wireClearWatchlist() {
 let chartGeom = null;
 
 async function openDetail(sym) {
-  if (state.view !== 'detail') state.cameFrom = state.view;
+  if (state.view !== 'detail') {
+    state.cameFrom = state.view;
+    // freeze the order being browsed, so swiping walks the same sequence
+    state.detailList = state.view === 'watchlist'
+      ? [...state.watchlist].filter(s => state.bySym.has(s))
+          .map(s => state.bySym.get(s)).sort((a, b) => a.rank - b.rank)
+          .map(m => m.symbol)
+      : sortedMembers().map(m => m.symbol);
+  }
   state.detail = sym;
   const m = state.bySym.get(sym);
-  $('#d-sym').textContent = m.symbol;
+  const list = state.detailList || [];
+  const pos = list.indexOf(sym);
+  $('#d-sym').textContent = pos >= 0 && list.length > 1
+    ? `${m.symbol}  ·  ${pos + 1} of ${list.length}` : m.symbol;
   $('#d-name').textContent = `${m.name} · ${m.sector}`;
   $('#d-price').textContent = `$${fmt.price(m.price)}`;
   updateStarButton();
@@ -520,6 +532,107 @@ function toggleStar(sym) {
   if (state.view === 'detail') updateStarButton();
 }
 
+/* ---------------- gestures ---------------- */
+
+const LONG_PRESS_MS = 420;
+const MOVE_CANCEL_PX = 12;   // a scroll should never fire either gesture
+
+// Tap selects (toggles the watchlist); press-and-hold opens the ticker view.
+// Movement past a small threshold cancels both, so scrolling stays scrolling.
+function wireRowGestures(container) {
+  let timer = null, row = null, longFired = false, x0 = 0, y0 = 0;
+
+  const clear = () => {
+    clearTimeout(timer);
+    timer = null;
+    if (row) row.classList.remove('pressing');
+    row = null;
+  };
+
+  const start = (target, x, y) => {
+    row = target.closest('.row');
+    if (!row) return;
+    longFired = false;
+    x0 = x; y0 = y;
+    row.classList.add('pressing');
+    const sym = row.dataset.sym;
+    timer = setTimeout(() => {
+      longFired = true;
+      if (row) row.classList.remove('pressing');
+      navigator.vibrate?.(12);
+      openDetail(sym);
+    }, LONG_PRESS_MS);
+  };
+
+  const move = (x, y) => {
+    if (!row) return;
+    if (Math.abs(x - x0) > MOVE_CANCEL_PX || Math.abs(y - y0) > MOVE_CANCEL_PX) clear();
+  };
+
+  const end = () => {
+    if (!row) return;
+    const sym = row.dataset.sym;
+    const fired = longFired;
+    clear();
+    if (!fired) toggleStar(sym);
+  };
+
+  container.addEventListener('touchstart',
+    e => start(e.target, e.touches[0].clientX, e.touches[0].clientY), { passive: true });
+  container.addEventListener('touchmove',
+    e => move(e.touches[0].clientX, e.touches[0].clientY), { passive: true });
+  container.addEventListener('touchend', end);
+  container.addEventListener('touchcancel', clear);
+
+  // pointer fallback for desktop; ignored when touch already handled it
+  container.addEventListener('mousedown', e => {
+    if (e.button === 0 && !('ontouchstart' in window)) start(e.target, e.clientX, e.clientY);
+  });
+  container.addEventListener('mousemove', e => {
+    if (!('ontouchstart' in window)) move(e.clientX, e.clientY);
+  });
+  container.addEventListener('mouseup', () => { if (!('ontouchstart' in window)) end(); });
+  container.addEventListener('mouseleave', clear);
+  // long-press on mobile otherwise raises the text-selection callout
+  container.addEventListener('contextmenu', e => e.preventDefault());
+}
+
+// Swipe left/right in the ticker view to move through the list in the order
+// it was opened from. Swipes starting on the chart are ignored - that area
+// belongs to the price scrubber.
+function wireDetailSwipe() {
+  const view = $('#view-detail');
+  let x0 = 0, y0 = 0, active = false;
+
+  view.addEventListener('touchstart', e => {
+    active = !e.target.closest('.chart-wrap');
+    x0 = e.touches[0].clientX;
+    y0 = e.touches[0].clientY;
+  }, { passive: true });
+
+  view.addEventListener('touchend', e => {
+    if (!active) return;
+    active = false;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - x0, dy = t.clientY - y0;
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    stepDetail(dx < 0 ? 1 : -1);
+  });
+}
+
+function stepDetail(delta) {
+  const list = state.detailList || [];
+  const i = list.indexOf(state.detail);
+  if (i < 0) return;
+  const next = list[i + delta];
+  if (!next) return;
+  navigator.vibrate?.(8);
+  const el = $('#view-detail');
+  el.classList.add(delta > 0 ? 'slide-left' : 'slide-right');
+  setTimeout(() => el.classList.remove('slide-left', 'slide-right'), 200);
+  openDetail(next);
+}
+
 /* ---------------- events ---------------- */
 
 function wireEvents() {
@@ -534,12 +647,7 @@ function wireEvents() {
   });
 
   for (const listSel of ['#screen-list', '#watchlist-list']) {
-    $(listSel).addEventListener('click', e => {
-      const star = e.target.closest('[data-star]');
-      if (star) { toggleStar(star.dataset.star); return; }
-      const row = e.target.closest('.row');
-      if (row) openDetail(row.dataset.sym);
-    });
+    wireRowGestures($(listSel));
   }
 
   document.querySelector('.tabbar').addEventListener('click', e => {
@@ -560,6 +668,8 @@ function wireEvents() {
   document.querySelectorAll('.suggest-btn').forEach(b =>
     b.addEventListener('click', () => suggestOne(b)));
   wireClearWatchlist();
+
+  wireDetailSwipe();
 
   const tilt = $('#ew-tilt');
   tilt.value = state.ewTilt;
