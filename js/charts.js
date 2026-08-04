@@ -24,23 +24,26 @@ function setupCanvas(canvas) {
 // the whole list is ever negative — as with momentum scores, which are
 // positive by construction for members — zero sits at the bottom instead, so
 // the full height is spent on the range that actually varies.
-// Cumulative return over the window, starting at exactly zero, drawn against
-// a shared vertical scale so every card is directly comparable: the zero line
-// sits at the same height on every card and a given height always means the
-// same percentage. `returns` are decimals (0 = flat), `scaleMax` the symmetric
-// half-range in the same units.
-export function drawSparkline(canvas, returns, scaleMax) {
+// Cumulative return over the window, starting at exactly zero. Each card is
+// scaled to its own range so the line fills the box and the shape is legible —
+// heights are NOT comparable between cards; the printed percentage carries the
+// magnitude. Zero is always inside the range (the series starts there), so the
+// dashed baseline stays visible and always meets the line's left end.
+// `returns` are decimals (0 = flat).
+export function drawSparkline(canvas, returns) {
   const { ctx, w, h } = setupCanvas(canvas);
   ctx.clearRect(0, 0, w, h);
-  if (!returns || returns.length < 2 || !scaleMax) return;
+  if (!returns || returns.length < 2) return;
 
   const end = returns[returns.length - 1];
   const color = col(end >= 0 ? '--up' : '--down');
-  const pad = 3;                       // keeps the stroke off the frame edge
-  const zero = h / 2;                  // identical on every card
-  const half = h / 2 - pad;
+  const pad = 4;                       // keeps the stroke off the frame edge
+  const lo = Math.min(...returns, 0);
+  const hi = Math.max(...returns, 0);
+  const span = Math.max(hi - lo, 0.004);   // a dead-flat name still draws a line
   const x = i => (i / (returns.length - 1)) * (w - 2) + 1;
-  const y = v => zero - (Math.max(-scaleMax, Math.min(scaleMax, v)) / scaleMax) * half;
+  const y = v => h - pad - ((v - lo) / span) * (h - 2 * pad);
+  const zero = y(0);
 
   // the zero line the move is measured from — present, but read second
   ctx.save();

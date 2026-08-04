@@ -115,20 +115,6 @@ function window21(m) {
   return { returns, chg: returns[returns.length - 1] };
 }
 
-// One symmetric scale for every card, so equal heights mean equal moves.
-// A high percentile rather than the max, so a single violent name can't
-// flatten every other chart; the rare bar beyond it is clamped.
-function sparkScale(members) {
-  const peaks = members
-    .map(m => window21(m).returns.map(Math.abs))
-    .filter(a => a.length)
-    .map(a => Math.max(...a))
-    .sort((a, b) => a - b);
-  if (!peaks.length) return 0.1;
-  const p = peaks[Math.min(peaks.length - 1, Math.floor(peaks.length * 0.95))];
-  return Math.max(0.05, Math.ceil(p * 20) / 20);   // round up to a clean 5%
-}
-
 // the one optional line under the ticker; kept in its own slot so selection
 // can refresh it without rebuilding the row
 function rowTag(m, showVol) {
@@ -182,8 +168,7 @@ function drawRowSparklines(container) {
   requestAnimationFrame(() => {
     container.querySelectorAll('.row').forEach(rowEl => {
       const m = state.bySym.get(rowEl.dataset.sym);
-      drawSparkline(rowEl.querySelector('canvas.spark'),
-                    window21(m).returns, state.sparkScale);
+      drawSparkline(rowEl.querySelector('canvas.spark'), window21(m).returns);
     });
   });
 }
@@ -763,7 +748,6 @@ async function boot() {
   state.meta = meta;
   state.members = screen.members;
   state.members.forEach(m => state.bySym.set(m.symbol, m));
-  state.sparkScale = sparkScale(state.members);
   if (riskData) {
     riskData.index = new Map(riskData.symbols.map((s, i) => [s, i]));
     state.risk = riskData;
