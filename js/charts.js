@@ -24,67 +24,55 @@ function setupCanvas(canvas) {
 // the whole list is ever negative — as with momentum scores, which are
 // positive by construction for members — zero sits at the bottom instead, so
 // the full height is spent on the range that actually varies.
-// The history reads as context and the latest value as the point being made,
-// so older bars are muted and faded toward the left while only the most
-// recent one carries the full accent colour. Bars are laid out right-aligned
-// so the final one ends flush with the canvas edge, letting the chart line up
-// with the value printed above it.
-const OLDEST_ALPHA = 0.45;   // leftmost bar; ramps to 1 at the newest
-
-export function drawBarSeries(canvas, values, scaleMax, { signed = true } = {}) {
+// A 21-day price sparkline with a dashed baseline at the window's opening
+// price, so the line's position against that line reads as gain or loss at a
+// glance. Colour comes from where it finishes relative to the start, not from
+// the day-to-day wiggle.
+export function drawSparkline(canvas, closes) {
   const { ctx, w, h } = setupCanvas(canvas);
-  const n = values.length;
-  const zero = signed ? h / 2 : h;
-  const span = signed ? h / 2 : h;
-  const slot = w / n;
-  const barW = Math.max(1, slot * 0.66);
-  const radius = Math.min(barW / 2, 2.5);
-  let newest = -1;
-  for (let i = n - 1; i >= 0; i--) if (values[i] != null) { newest = i; break; }
+  if (!closes || closes.length < 2) { ctx.clearRect(0, 0, w, h); return; }
+  const base = closes[0];
+  const up = closes[closes.length - 1] >= base;
+  const color = col(up ? '--up' : '--down');
+
+  // keep the baseline inside the frame even when price never revisits it
+  const lo = Math.min(base, ...closes);
+  const hi = Math.max(base, ...closes);
+  const pad = 4;
+  const span = (hi - lo) || Math.abs(base) * 0.01 || 1;
+  const x = i => (i / (closes.length - 1)) * w;
+  const y = v => h - pad - ((v - lo) / span) * (h - pad * 2);
 
   ctx.clearRect(0, 0, w, h);
-  values.forEach((v, i) => {
-    if (v == null) return;
-    const clipped = Math.abs(v) > scaleMax;
-    const clamped = Math.max(-scaleMax, Math.min(scaleMax, v));
-    const barH = Math.max(1, (Math.abs(clamped) / scaleMax) * span);
-    // right-aligned within the slot, so the last bar ends exactly at w
-    const x = i * slot + (slot - barW);
-    const up = clamped >= 0;
-    const y = up ? zero - barH : zero;
-    const live = i === newest;
 
-    ctx.globalAlpha = live ? 1
-      : OLDEST_ALPHA + (1 - OLDEST_ALPHA) * (n > 1 ? i / (n - 1) : 1);
-    ctx.fillStyle = live
-      ? col(up ? '--up' : '--down')
-      : col(up ? '--bar-dim-up' : '--bar-dim-down');
+  // opening price — the zero line the move is measured from
+  ctx.save();
+  ctx.setLineDash([2, 3]);
+  ctx.strokeStyle = col('--grid');
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, y(base));
+  ctx.lineTo(w, y(base));
+  ctx.stroke();
+  ctx.restore();
 
-    // round only the growing end, so bars still sit flat on the baseline
-    ctx.beginPath();
-    const r = Math.min(radius, barH);
-    if (ctx.roundRect) {
-      ctx.roundRect(x, y, barW, barH, up ? [r, r, 0, 0] : [0, 0, r, r]);
-    } else {
-      ctx.rect(x, y, barW, barH);
-    }
-    ctx.fill();
-
-    if (clipped) {
-      const cx = x + barW / 2;
-      const tip = up ? y : y + barH;
-      const dir = up ? -1 : 1;   // chevron points further outward
-      ctx.beginPath();
-      ctx.moveTo(cx - barW * 0.42, tip - dir * 0.5);
-      ctx.lineTo(cx, tip + dir * 2.5);
-      ctx.lineTo(cx + barW * 0.42, tip - dir * 0.5);
-      ctx.strokeStyle = ctx.fillStyle;
-      ctx.lineWidth = 1;
-      ctx.lineJoin = ctx.lineCap = 'round';
-      ctx.stroke();
-    }
-  });
+  // faint wash between the line and its baseline, for body
+  ctx.beginPath();
+  closes.forEach((v, i) => i ? ctx.lineTo(x(i), y(v)) : ctx.moveTo(x(i), y(v)));
+  ctx.lineTo(x(closes.length - 1), y(base));
+  ctx.lineTo(x(0), y(base));
+  ctx.closePath();
+  ctx.globalAlpha = 0.13;
+  ctx.fillStyle = color;
+  ctx.fill();
   ctx.globalAlpha = 1;
+
+  ctx.beginPath();
+  closes.forEach((v, i) => i ? ctx.lineTo(x(i), y(v)) : ctx.moveTo(x(i), y(v)));
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.lineJoin = ctx.lineCap = 'round';
+  ctx.stroke();
 }
 
 // Price chart with y gridlines, area wash, end-dot; returns a geometry object

@@ -2,22 +2,20 @@
 
 :root {
   color-scheme: dark;
-  --page:        #0d0d0d;
-  --surface:     #1a1a19;
-  --surface-2:   #222221;
+  --page:        #000000;
+  --surface:     #0e0e0e;
+  --surface-2:   #171717;
   --ink:         #ffffff;
-  --ink-2:       #c3c2b7;
-  --muted:       #898781;
-  --grid:        #2c2c2a;
-  --border:      rgba(255, 255, 255, 0.10);
-  --up:          #0ca30c;
-  --down:        #e66767;
-  /* history bars: muted so the latest bar reads as the live value */
-  --bar-dim-up:   #4c6b52;
-  --bar-dim-down: #7c5252;
-  --accent:      #0ca30c;
+  --ink-2:       #d8d8d8;
+  --muted:       #7a7a7a;
+  --grid:        #232323;
+  --border:      rgba(255, 255, 255, 0.06);
+  /* acid green / hot red — the only saturated colour on the card */
+  --up:          #35ff5a;
+  --down:        #ff3b30;
+  --accent:      #35ff5a;
   --blue:        #3987e5;
-  --radius:      14px;
+  --radius:      16px;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -71,48 +69,65 @@ body {
 .list { padding: 8px 12px; display: flex; flex-direction: column; gap: 8px; }
 .row {
   display: grid;
-  grid-template-columns: 28px minmax(0, 1fr) 148px 30px;
-  align-items: center; gap: 10px;
+  grid-template-columns: 20px minmax(0, 1fr) 76px 66px 26px;
+  align-items: center; gap: 9px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 12px 12px 12px 14px;
+  padding: 14px 12px 14px 16px;
   cursor: pointer;
 }
 .row:active { background: var(--surface-2); }
-.rank { font-size: 13px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
+.rank {
+  font-size: 11.5px; font-weight: 700; color: #5a5a5a;
+  font-variant-numeric: tabular-nums; text-align: right;
+}
 .row .id { min-width: 0; }
 .row .sym {
-  font-size: 16px; font-weight: 700; letter-spacing: 0.01em;
+  font-size: 21px; font-weight: 800; letter-spacing: -0.01em;
+  color: var(--ink); line-height: 1.15;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .row .name {
-  font-size: 12px; color: var(--muted);
+  font-size: 12.5px; color: var(--muted); margin-top: 1px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.spark-wrap { width: 148px; }
-.spark-head {
-  display: flex; align-items: baseline; justify-content: space-between;
-  gap: 6px; margin-bottom: 1px;
-}
-.spark-label {
-  font-size: 8.5px; font-weight: 700; color: var(--muted);
-  letter-spacing: 0.03em;
-}
-.spark-now {
-  font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums;
-  line-height: 1;
-}
-.spark-now.up   { color: var(--up); }
-.spark-now.down { color: var(--down); }
-.row canvas.spark { width: 148px; height: 56px; display: block; }
+.row canvas.spark { width: 76px; height: 38px; display: block; }
 
-.star {
-  border: 0; background: none; color: var(--muted);
-  font-size: 22px; line-height: 1; cursor: pointer; padding: 6px 0;
+.chg-col { text-align: right; }
+.chg21 {
+  font-size: 17px; font-weight: 800; font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em; line-height: 1.1;
 }
-.star.on { color: var(--accent); text-shadow: 0 0 12px rgba(12, 163, 12, 0.55); }
-.star.big { font-size: 28px; }
+.chg21.up   { color: var(--up); }
+.chg21.down { color: var(--down); }
+.chg21-label {
+  font-size: 9.5px; font-weight: 700; color: var(--muted);
+  letter-spacing: 0.06em; margin-top: 1px;
+}
+
+/* A drawn star rather than a glyph: as an outline it stays quiet enough to
+   sit beside the numbers, and fills with the accent only once it's on. */
+.star {
+  border: 0; background: none; cursor: pointer;
+  width: 26px; height: 26px; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  -webkit-mask: var(--star-mask) center / 17px 17px no-repeat;
+  mask: var(--star-mask) center / 17px 17px no-repeat;
+  background-color: #3a3a3a;
+}
+.star.on {
+  background-color: var(--accent);
+  filter: drop-shadow(0 0 5px rgba(53, 255, 90, 0.5));
+}
+.star.big {
+  width: 40px; height: 40px;
+  -webkit-mask-size: 27px 27px; mask-size: 27px 27px;
+}
+
+:root {
+  --star-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2.6l2.9 5.9 6.5.95-4.7 4.58 1.11 6.47L12 17.44l-5.81 3.06 1.11-6.47L2.6 9.45l6.5-.95z'/%3E%3C/svg%3E");
+}
 
 /* ---------- tab bar ---------- */
 .tabbar {
